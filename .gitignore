@@ -1,0 +1,8 @@
+target/
+.classpath
+.project
+.settings/
+.theia/
+application.log*
+/.apt_generated/
+/.apt_generated_tests/
