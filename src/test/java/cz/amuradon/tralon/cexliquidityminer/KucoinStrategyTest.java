@@ -89,8 +89,28 @@ public class KucoinStrategyTest {
 	 * - one order - ask or bid
 	 * - one order on each side
 	 * - multiple orders on same level
-	 * - multiple orders on differenct levels
+	 * - multiple orders on different levels
+	 * - partial fill
+	 * - multiple strategies
 	 */
+	
+	@Test
+	public void noOrdersNoBaseBalanceShouldCreateQuoteOrderOnly() throws IOException {
+		accountBalanceResponses.add(accountBalancesResponse(BASE_TOKEN, 0));
+		accountBalanceResponses.add(accountBalancesResponse(QUOTE_TOKEN, 1000));
+		
+		KucoinStrategy strategy = new KucoinStrategy(restClientMock, publicWsClientMock, privateWsClientMock,
+				BASE_TOKEN, QUOTE_TOKEN, 100, 100);
+		strategy.run();
+		
+		getCallbacks();
+		
+		publishL2Event(new Double[][] {{2.1, 5.0}, {2.2, 10.0}, {2.3, 18.0}, {2.4, 20.0}, {2.5, 30.0}, {2.6, 40.0}},
+				new Double[][] {{1.9, 3.0}, {1.8, 5.0}, {1.7, 14.0}, {1.6, 20.0}, {1.5, 50.0}, {1.4, 80.0}});
+		
+		verify(restClientMock.orderAPI(), times(0)).cancelOrder(anyString());
+		verify(restClientMock.orderAPI(), times(1)).createOrder(any());
+	}
 	
 	@Test
 	public void oneOrderEachSideCorrectLevelsShouldDoNothing() throws IOException {
@@ -101,7 +121,7 @@ public class KucoinStrategyTest {
 		accountBalanceResponses.add(accountBalancesResponse(QUOTE_TOKEN, 10));
 		
 		KucoinStrategy strategy = new KucoinStrategy(restClientMock, publicWsClientMock, privateWsClientMock,
-				BASE_TOKEN, QUOTE_TOKEN, 100);
+				BASE_TOKEN, QUOTE_TOKEN, 100, 100);
 		strategy.run();
 		
 		getCallbacks();

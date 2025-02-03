@@ -27,6 +27,10 @@ public class Order {
 		this.size = size;
 	}
 	
+	public BigDecimal size() {
+		return size;
+	}
+	
 	public String side() {
 		return side;
 	}

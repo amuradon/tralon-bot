@@ -2,11 +2,15 @@ package cz.amuradon.tralon.cexliquidityminer;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -16,6 +20,7 @@ import com.kucoin.sdk.KucoinClientBuilder;
 import com.kucoin.sdk.KucoinPrivateWSClient;
 import com.kucoin.sdk.KucoinPublicWSClient;
 import com.kucoin.sdk.KucoinRestClient;
+import com.kucoin.sdk.rest.request.OrderCreateApiRequest;
 import com.kucoin.sdk.rest.response.AccountBalancesResponse;
 import com.kucoin.sdk.websocket.event.AccountChangeEvent;
 import com.kucoin.sdk.websocket.event.KucoinEvent;
@@ -37,9 +42,32 @@ public class KucoinStrategy {
 	 *   - nepocitam ted spread, ale pouzivam order book - na 5. urovni v order book bez pocitani volume pred
 	 *   - pocitat, kolik volume je pred v order book?
 	 * - pokud existuje available balance, ale order uz existuje, vytvorit dalsi nebo reset?
+	 * - delay pro reakci s ordery pro vice volatilni tokeny
 	 * */
 
+	private static final String LIMIT = "limit";
+
+	private static final String SELL = "sell";
+
+	private static final String BUY = "buy";
+
 	private static final Logger LOGGER = LoggerFactory.getLogger(KucoinStrategy.class);
+	
+	private final KucoinRestClient restClient;
+    
+    private final KucoinPublicWSClient wsClientPublic;
+    
+	private final KucoinPrivateWSClient wsClientPrivate;
+	
+	private final String baseToken;
+	
+	private final String quoteToken;
+	
+	private final String symbol;
+	
+	private final BigDecimal sideVolumeThreshold;
+	
+	private final BigDecimal maxBalanceToUse;
 	
     private Map<String, Order> orders;
     
@@ -47,29 +75,13 @@ public class KucoinStrategy {
     
     private BigDecimal quoteBalance = BigDecimal.ZERO;
     
-    private String baseToken;
-    
-    private String quoteToken;
-    
-    private String symbol;
-    
     private long lastBalanceChange;
     
     private long lastOrderChange;
     
-    private BigDecimal sideVolumeThreshold;
-    
-    private final KucoinRestClient restClient;
-    
-    private final KucoinPublicWSClient wsClientPublic;
-    
-	private final KucoinPrivateWSClient wsClientPrivate;
-	
-	private final List<Order> orderProposals;
-    
     public KucoinStrategy(final KucoinRestClient restClient, final KucoinPublicWSClient wsClientPublic,
     		final KucoinPrivateWSClient wsClientPrivate, final String baseToken, final String quoteToken,
-    		final int sideVolumeThreshold) {
+    		final int sideVolumeThreshold, final int maxBalanceToUse) {
 		this.restClient = restClient;
 		this.wsClientPublic = wsClientPublic;
 		this.wsClientPrivate = wsClientPrivate;
@@ -77,9 +89,8 @@ public class KucoinStrategy {
 		this.quoteToken = quoteToken;
 		symbol = baseToken + "-" + quoteToken;
 		this.sideVolumeThreshold = new BigDecimal(sideVolumeThreshold);
-		lastBalanceChange = new Date().getTime();
+		this.maxBalanceToUse = new BigDecimal(maxBalanceToUse);
 		lastOrderChange = lastBalanceChange;
-		orderProposals = new ArrayList<>();
     }
 
     public void run() {
@@ -87,6 +98,8 @@ public class KucoinStrategy {
         	orders = restClient.orderAPI().listOrders(symbol, null, null, null, "active", null, null, 20, 1).getItems()
         		.stream().collect(Collectors.toMap(r -> r.getId(), r -> new Order(r.getId(), r.getSide(), r.getSize(), r.getPrice())));
         	LOGGER.info("Current orders {}", orders);
+        	
+        	lastBalanceChange = new Date().getTime();
         	for (AccountBalancesResponse balance : restClient.accountAPI().listAccounts(null, "trade")) {
         		if (baseToken.equalsIgnoreCase(balance.getCurrency())) {
         			baseBalance = balance.getAvailable();
@@ -117,13 +130,17 @@ public class KucoinStrategy {
         // Jsou order na 5. urovni? -ne-> predelej
         // Cancel order -> pockat na CO event a balance event
         // Jak zjistit, ze jsem posledni v rade na dane price level
-        for (Order order: orders.values()) {
-        	if (("buy".equalsIgnoreCase(order.side()) && order.price().compareTo(bidPriceLevel) != 0)
-        			|| ("sell".equalsIgnoreCase(order.side()) && order.price().compareTo(askPriceLevel) != 0)) {
+        for (Iterator<Entry<String, Order>> it = orders.entrySet().iterator(); it.hasNext(); ) {
+        	Entry<String, Order> entry = it.next();
+        	Order order = entry.getValue();
+        	if ((BUY.equalsIgnoreCase(order.side()) && order.price().compareTo(bidPriceLevel) != 0)
+        			|| (SELL.equalsIgnoreCase(order.side()) && order.price().compareTo(askPriceLevel) != 0)) {
         		try {
+        			// Wait for balance update
         			lastOrderChange = Long.MAX_VALUE;
         			lastBalanceChange = Long.MAX_VALUE;
 					restClient.orderAPI().cancelOrder(order.orderId());
+					it.remove();
 				} catch (IOException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
@@ -133,12 +150,39 @@ public class KucoinStrategy {
         
         // Vyuzivam timestamp na zpravach k synchronizaci mezi async udalostmi
         long timestamp = data.getTimestamp();
-		if (timestamp > lastBalanceChange
-				&& timestamp > lastOrderChange
-				&& baseBalance.compareTo(BigDecimal.ZERO) > 0
-				// && quoteBalance.
-				) {
-			// Vytvor nove ordery
+		if (timestamp > lastBalanceChange) {
+			try {
+				if (baseBalance.compareTo(BigDecimal.ZERO) > 0) {
+					restClient.orderAPI().createOrder(OrderCreateApiRequest.builder()
+							.clientOid(UUID.randomUUID().toString())
+							.side(SELL)
+							.symbol(symbol)
+							.price(askPriceLevel)
+							.size(baseBalance)
+							.type(LIMIT)
+							.build());
+				}
+				
+				BigDecimal balanceQuoteLeftForBids = maxBalanceToUse.subtract(askPriceLevel.multiply(baseBalance));
+				for (Order order : orders.values()) {
+					if (SELL.equalsIgnoreCase(baseToken)) {
+						balanceQuoteLeftForBids = balanceQuoteLeftForBids.subtract(order.price().multiply(order.size()));
+					}
+				}
+				
+				if (balanceQuoteLeftForBids.compareTo(BigDecimal.ZERO) > 0) {
+					restClient.orderAPI().createOrder(OrderCreateApiRequest.builder()
+							.clientOid(UUID.randomUUID().toString())
+							.side(BUY)
+							.symbol(symbol)
+							.price(bidPriceLevel)
+							.size(balanceQuoteLeftForBids.divide(bidPriceLevel, 6, RoundingMode.FLOOR))
+							.type(LIMIT)
+							.build());
+				}
+			} catch (IOException e) {
+				throw new IllegalStateException("Could not create orders", e);
+			}
 		}
     }
     
