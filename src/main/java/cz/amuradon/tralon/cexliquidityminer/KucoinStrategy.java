@@ -126,9 +126,6 @@ public class KucoinStrategy {
         LOGGER.debug("Target ask price: {}", askPriceLevel);
         LOGGER.debug("Target bid price: {}", bidPriceLevel);
         
-        // Existuji ordery? -> zaloz
-        // Jsou order na 5. urovni? -ne-> predelej
-        // Cancel order -> pockat na CO event a balance event
         // Jak zjistit, ze jsem posledni v rade na dane price level
         for (Iterator<Entry<String, Order>> it = orders.entrySet().iterator(); it.hasNext(); ) {
         	Entry<String, Order> entry = it.next();
@@ -141,6 +138,7 @@ public class KucoinStrategy {
         			lastBalanceChange = Long.MAX_VALUE;
 					restClient.orderAPI().cancelOrder(order.orderId());
 					it.remove();
+					LOGGER.info("Cancelling order {}", order);
 				} catch (IOException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
@@ -150,35 +148,45 @@ public class KucoinStrategy {
         
         // Vyuzivam timestamp na zpravach k synchronizaci mezi async udalostmi
         long timestamp = data.getTimestamp();
-		if (timestamp > lastBalanceChange) {
+		if (timestamp > lastBalanceChange && timestamp > lastOrderChange) {
 			try {
 				if (baseBalance.compareTo(BigDecimal.ZERO) > 0) {
+					final String clientOrderId = UUID.randomUUID().toString();
 					restClient.orderAPI().createOrder(OrderCreateApiRequest.builder()
-							.clientOid(UUID.randomUUID().toString())
+							.clientOid(clientOrderId)
 							.side(SELL)
 							.symbol(symbol)
 							.price(askPriceLevel)
 							.size(baseBalance)
 							.type(LIMIT)
 							.build());
+					LOGGER.info("Placing new limit order - clOrdId: {}, side: {}, price: {}, size: {}",
+							clientOrderId, SELL, askPriceLevel, baseBalance);
+				} else {
+					LOGGER.info("No new sell orders placed");
 				}
 				
-				BigDecimal balanceQuoteLeftForBids = maxBalanceToUse.subtract(askPriceLevel.multiply(baseBalance));
+				BigDecimal balanceQuoteLeftForBids = maxBalanceToUse.min(quoteBalance)
+						.subtract(askPriceLevel.multiply(baseBalance));
 				for (Order order : orders.values()) {
-					if (SELL.equalsIgnoreCase(baseToken)) {
-						balanceQuoteLeftForBids = balanceQuoteLeftForBids.subtract(order.price().multiply(order.size()));
-					}
+					balanceQuoteLeftForBids = balanceQuoteLeftForBids.subtract(order.price().multiply(order.size()));
 				}
 				
-				if (balanceQuoteLeftForBids.compareTo(BigDecimal.ZERO) > 0) {
+				BigDecimal size = balanceQuoteLeftForBids.divide(bidPriceLevel, 6, RoundingMode.FLOOR);
+				if (size.compareTo(BigDecimal.ZERO) > 0) {
+					final String clientOrderId = UUID.randomUUID().toString();
 					restClient.orderAPI().createOrder(OrderCreateApiRequest.builder()
-							.clientOid(UUID.randomUUID().toString())
+							.clientOid(clientOrderId)
 							.side(BUY)
 							.symbol(symbol)
 							.price(bidPriceLevel)
-							.size(balanceQuoteLeftForBids.divide(bidPriceLevel, 6, RoundingMode.FLOOR))
+							.size(size)
 							.type(LIMIT)
 							.build());
+					LOGGER.info("Placing new limit order - clOrdId: {}, side: {}, price: {}, size: {}",
+							clientOrderId, BUY, bidPriceLevel, size);
+				} else {
+					LOGGER.info("No new buy orders placed");
 				}
 			} catch (IOException e) {
 				throw new IllegalStateException("Could not create orders", e);
