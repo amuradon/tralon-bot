@@ -91,13 +91,12 @@ public class KucoinStrategyTest {
 		Mockito.when(restClientMock.accountAPI().listAccounts(null, "trade")).thenReturn(accountBalanceResponses);
 		
 		strategy = new KucoinStrategy(restClientMock, publicWsClientMock, privateWsClientMock,
-				BASE_TOKEN, QUOTE_TOKEN, 100, 100);
+				BASE_TOKEN, QUOTE_TOKEN, 100, 100, 0);
 		
 	}
 	
 	/*
-	 * - full fill
-	 * - partial fill
+	 * - price change delay test 
 	 */
 	
 	/**
@@ -106,7 +105,7 @@ public class KucoinStrategyTest {
 	 * buy limit order for given amount of balance (e.g. 100 USDT combined).
 	 */
 	@Test
-	public void noOrdersNoBaseBalanceShouldCreateBuyOrderOnly() throws IOException {
+	public void noOrdersNoBaseBalanceShouldCreateBuyOrderOnly() throws Exception {
 		addAccountBalancesResponse(BASE_TOKEN, 0);
 		addAccountBalancesResponse(QUOTE_TOKEN, 1000);
 		
@@ -123,7 +122,7 @@ public class KucoinStrategyTest {
 		
 		OrderCreateApiRequest orderCreateRequest = orderCreateRequestCaptor.getValue();
 		
-		assertOrder("buy", "1.5", "66.666666", orderCreateRequest);
+		assertOrder("buy", "1.5", "66.6666", orderCreateRequest);
 		
 		publishAccounChangeEvent(QUOTE_TOKEN, 900);
 		publishOrderChangeEvent("open", "newOrder1", orderCreateRequest);
@@ -134,9 +133,12 @@ public class KucoinStrategyTest {
 		verify(restClientMock.orderAPI(), times(1)).createOrder(orderCreateRequestCaptor.capture());
 	}
 
-	private void publishTestOrderBook() {
+	private void publishTestOrderBook() throws InterruptedException {
 		publishL2Event(new Double[][] {{2.1, 5.0}, {2.2, 10.0}, {2.3, 18.0}, {2.4, 20.0}, {2.5, 30.0}, {2.6, 40.0}},
 				new Double[][] {{1.9, 3.0}, {1.8, 5.0}, {1.7, 14.0}, {1.6, 20.0}, {1.5, 50.0}, {1.4, 80.0}});
+		
+		// XXX How to make it better?
+		Thread.sleep(1000);
 	}
 
 	/**
@@ -144,7 +146,7 @@ public class KucoinStrategyTest {
 	 * at all so no orders can be created.
 	 */
 	@Test
-	public void noOrdersNoBalanceShouldNotCreateAnyOrder() throws IOException {
+	public void noOrdersNoBalanceShouldNotCreateAnyOrder() throws Exception {
 		addAccountBalancesResponse(BASE_TOKEN, 0);
 		addAccountBalancesResponse(QUOTE_TOKEN, 0);
 		
@@ -165,7 +167,7 @@ public class KucoinStrategyTest {
 	 * for base currency, it should create only sell orders with full size regardless set balance limit.
 	 */
 	@Test
-	public void noOrdersBigBaseBalanceShouldCreateSellOrderOnly() throws IOException {
+	public void noOrdersBigBaseBalanceShouldCreateSellOrderOnly() throws Exception {
 		addAccountBalancesResponse(BASE_TOKEN, 100);
 		addAccountBalancesResponse(QUOTE_TOKEN, 1000);
 		
@@ -197,7 +199,7 @@ public class KucoinStrategyTest {
 	 * When there are orders on right price levels and no available base balance, do nothing.
 	 */
 	@Test
-	public void oneOrderEachSideCorrectLevelsAndNoBaseBalanceShouldDoNothing() throws IOException {
+	public void oneOrderEachSideCorrectLevelsAndNoBaseBalanceShouldDoNothing() throws Exception {
 		addOrderResponse("orderBuy", SYMBOL, "buy", 30, "1.5");
 		addOrderResponse("orderSell", SYMBOL, "sell", 30, "2.4");
 		
@@ -220,7 +222,7 @@ public class KucoinStrategyTest {
 	 * When there are orders on right price levels but available base balance, create additional sell order.
 	 */
 	@Test
-	public void oneOrderEachSideCorrectLevelsButBaseBalanceShouldCreateAdditionalSellOrder() throws IOException {
+	public void oneOrderEachSideCorrectLevelsButBaseBalanceShouldCreateAdditionalSellOrder() throws Exception {
 		addOrderResponse("orderBuy", SYMBOL, "buy", 30, "1.5");
 		addOrderResponse("orderSell", SYMBOL, "sell", 20, "2.4");
 		
@@ -257,7 +259,7 @@ public class KucoinStrategyTest {
 	 * Note: multiple orders either on same or different level goes through the same program path
 	 */
 	@Test
-	public void oneOrderEachSidePriceMovesShouldRecreateOrders() throws IOException {
+	public void oneOrderEachSidePriceMovesShouldRecreateOrders() throws Exception {
 		addOrderResponse("orderBuy", SYMBOL, "buy", 30, "1.5");
 		addOrderResponse("orderSell", SYMBOL, "sell", 20, "2.4");
 		
@@ -270,28 +272,31 @@ public class KucoinStrategyTest {
 		
 		getCallbacks();
 		
+		when(restClientMock.orderAPI().cancelOrder(eq("orderBuy"))).thenAnswer(i -> {
+			publishOrderChangeEvent("cancelled", "orderBuy", SYMBOL);
+			publishAccounChangeEvent(QUOTE_TOKEN, 55);
+			return null;
+		});
+		when(restClientMock.orderAPI().cancelOrder(eq("orderSell"))).thenAnswer(i -> {
+			publishOrderChangeEvent("cancelled", "orderSell", SYMBOL);
+			publishAccounChangeEvent(BASE_TOKEN, 20);
+			return null;
+		});
+			
 		publishL2Event(new Double[][] {{2.2, 5.0}, {2.3, 10.0}, {2.4, 18.0}, {2.5, 20.0}, {2.6, 30.0}, {2.7, 40.0}},
 				new Double[][] {{2.0, 3.0}, {1.9, 5.0}, {1.8, 14.0}, {1.7, 20.0}, {1.6, 50.0}, {1.5, 80.0}});
+		
+		// XXX How to make it better?
+		Thread.sleep(1000);
 		
 		verify(restClientMock.orderAPI(), times(1)).cancelOrder(eq("orderBuy"));
 		verify(restClientMock.orderAPI(), times(1)).cancelOrder(eq("orderSell"));
-		verify(restClientMock.orderAPI(), never()).createOrder(any());
-		
-		publishOrderChangeEvent("cancelled", "orderBuy", SYMBOL);
-		publishOrderChangeEvent("cancelled", "orderSell", SYMBOL);
-		publishAccounChangeEvent(BASE_TOKEN, 20);
-		publishAccounChangeEvent(QUOTE_TOKEN, 55);
-		
-		publishL2Event(new Double[][] {{2.2, 5.0}, {2.3, 10.0}, {2.4, 18.0}, {2.5, 20.0}, {2.6, 30.0}, {2.7, 40.0}},
-				new Double[][] {{2.0, 3.0}, {1.9, 5.0}, {1.8, 14.0}, {1.7, 20.0}, {1.6, 50.0}, {1.5, 80.0}});
-		
-		// The cancel calls above ^^^
-		verify(restClientMock.orderAPI(), times(2)).cancelOrder(anyString());
 		verify(restClientMock.orderAPI(), times(2)).createOrder(orderCreateRequestCaptor.capture());
+		
 		
 		List<OrderCreateApiRequest> orderCreateRequests = orderCreateRequestCaptor.getAllValues();
 		assertOrder("sell", "2.5", "20", orderCreateRequests.get(0));
-		assertOrder("buy", "1.6", "31.250000", orderCreateRequests.get(1));
+		assertOrder("buy", "1.6", "31.2500", orderCreateRequests.get(1));
 		
 		publishAccounChangeEvent(BASE_TOKEN, 0);
 		publishAccounChangeEvent(QUOTE_TOKEN, 0);
@@ -304,7 +309,7 @@ public class KucoinStrategyTest {
 	 * as balance to use is exceeded.
 	 */
 	@Test
-	public void oneOrderEachBuySideFilledShouldCreateNewSell() throws IOException {
+	public void oneOrderEachBuySideFilledShouldCreateNewSell() throws Exception {
 		addOrderResponse("orderBuy", SYMBOL, "buy", 30, "1.5");
 		addOrderResponse("orderSell", SYMBOL, "sell", 20, "2.4");
 		
@@ -342,7 +347,7 @@ public class KucoinStrategyTest {
 	 * as balance to use is exceeded.
 	 */
 	@Test
-	public void oneOrderEachSideSellFilledShouldCreateNewBuy() throws IOException {
+	public void oneOrderEachSideSellFilledShouldCreateNewBuy() throws Exception {
 		addOrderResponse("orderBuy", SYMBOL, "buy", 30, "1.5");
 		addOrderResponse("orderSell", SYMBOL, "sell", 30, "2.4");
 		
@@ -364,7 +369,7 @@ public class KucoinStrategyTest {
 		verify(restClientMock.orderAPI(), times(1)).createOrder(orderCreateRequestCaptor.capture());
 		
 		OrderCreateApiRequest orderCreateRequest = orderCreateRequestCaptor.getValue();
-		assertOrder("buy", "1.5", "36.666666", orderCreateRequest);
+		assertOrder("buy", "1.5", "36.6666", orderCreateRequest);
 		
 		publishAccounChangeEvent(QUOTE_TOKEN, 10);
 		publishOrderChangeEvent("open", "newSellOrder", orderCreateRequest);
@@ -380,7 +385,7 @@ public class KucoinStrategyTest {
 	 * buy order keeps open.
 	 */
 	@Test
-	public void oneOrderEachBuySidePartialFilledShouldCreateNewSell() throws IOException {
+	public void oneOrderEachBuySidePartialFilledShouldCreateNewSell() throws Exception {
 		addOrderResponse("orderBuy", SYMBOL, "buy", 30, "1.5");
 		addOrderResponse("orderSell", SYMBOL, "sell", 20, "2.4");
 		
@@ -418,7 +423,7 @@ public class KucoinStrategyTest {
 	 * sell order keeps open.
 	 */
 	@Test
-	public void oneOrderEachSideSellPartialFilledShouldCreateNewBuy() throws IOException {
+	public void oneOrderEachSideSellPartialFilledShouldCreateNewBuy() throws Exception {
 		addOrderResponse("orderBuy", SYMBOL, "buy", 30, "1.5");
 		addOrderResponse("orderSell", SYMBOL, "sell", 30, "2.4");
 		
@@ -440,7 +445,7 @@ public class KucoinStrategyTest {
 		verify(restClientMock.orderAPI(), times(1)).createOrder(orderCreateRequestCaptor.capture());
 		
 		OrderCreateApiRequest orderCreateRequest = orderCreateRequestCaptor.getValue();
-		assertOrder("buy", "1.5", "12.666666", orderCreateRequest);
+		assertOrder("buy", "1.5", "12.6666", orderCreateRequest);
 		
 		publishAccounChangeEvent(QUOTE_TOKEN, 27);
 		publishOrderChangeEvent("open", "newSellOrder", orderCreateRequest);
@@ -494,14 +499,7 @@ public class KucoinStrategyTest {
 	}
 	
 	private void publishOrderChangeEvent(String type, String id, String symbol) {
-		KucoinEvent<OrderChangeEvent> event = new KucoinEvent<>();
-		OrderChangeEvent data = new OrderChangeEvent();
-		event.setData(data);
-		data.setType(type);
-		data.setOrderId(id);
-		data.setTs(timestamp++);
-		data.setSymbol(symbol);
-		orderChangeEventCallback.onResponse(event);
+		publishOrderChangeEvent(type, id, symbol, null, null, null);
 	}
 
 	private void publishOrderChangeEvent(String type, String id, String symbol, String side, BigDecimal size,
@@ -511,7 +509,7 @@ public class KucoinStrategyTest {
 		event.setData(data);
 		data.setType(type);
 		data.setOrderId(id);
-		data.setTs(timestamp++);
+		data.setOrderTime(timestamp++);
 		data.setSymbol(symbol);
 		data.setSide(side);
 		data.setSize(size);

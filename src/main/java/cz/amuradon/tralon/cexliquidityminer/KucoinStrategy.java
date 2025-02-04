@@ -4,10 +4,13 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Date;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -60,19 +63,36 @@ public class KucoinStrategy {
 	
 	private final BigDecimal maxBalanceToUse;
 	
+	private final int priceChangeDelayMs;
+	
+	private final ExecutorService executorService;
+	
+	private final Object monitor;
+	
     private Map<String, Order> orders;
     
     private BigDecimal baseBalance = BigDecimal.ZERO;
     
     private BigDecimal quoteBalance = BigDecimal.ZERO;
     
-    private long lastBalanceChange;
+    private BigDecimal currentBidPriceLevel;
     
-    private long lastOrderChange;
+    private BigDecimal currentAskPriceLevel;
+    
+    private BigDecimal bidPriceLevelProposal;
+    
+    private BigDecimal askPriceLevelProposal;
+    
+    private long askPriceLevelProposalTimestamp;
+   
+    private long bidPriceLevelProposalTimestamp;
+    
+    private AtomicInteger waitForBalanceUpdate;
     
     public KucoinStrategy(final KucoinRestClient restClient, final KucoinPublicWSClient wsClientPublic,
     		final KucoinPrivateWSClient wsClientPrivate, final String baseToken, final String quoteToken,
-    		final int sideVolumeThreshold, final int maxBalanceToUse) {
+    		final int sideVolumeThreshold, final int maxBalanceToUse,
+    		final int priceChangeDelayMs) {
 		this.restClient = restClient;
 		this.wsClientPublic = wsClientPublic;
 		this.wsClientPrivate = wsClientPrivate;
@@ -81,16 +101,22 @@ public class KucoinStrategy {
 		symbol = baseToken + "-" + quoteToken;
 		this.sideVolumeThreshold = new BigDecimal(sideVolumeThreshold);
 		this.maxBalanceToUse = new BigDecimal(maxBalanceToUse);
-		lastOrderChange = lastBalanceChange;
+		this.priceChangeDelayMs = priceChangeDelayMs;
+		this.executorService = Executors.newSingleThreadExecutor();
+		this.monitor = new Object();
+		currentBidPriceLevel = BigDecimal.ZERO;
+		currentAskPriceLevel = BigDecimal.ZERO;
+		bidPriceLevelProposal = BigDecimal.ZERO;
+		askPriceLevelProposal = BigDecimal.ZERO;
+		waitForBalanceUpdate = new AtomicInteger(0);
     }
 
     public void run() {
         try {
         	orders = restClient.orderAPI().listOrders(symbol, null, null, null, "active", null, null, 20, 1).getItems()
-        		.stream().collect(Collectors.toMap(r -> r.getId(), r -> new Order(r.getId(), r.getSide(), r.getSize(), r.getPrice())));
+        		.stream().collect(Collectors.toConcurrentMap(r -> r.getId(), r -> new Order(r.getId(), r.getSide(), r.getSize(), r.getPrice())));
         	LOGGER.info("Current orders {}", orders);
         	
-        	lastBalanceChange = new Date().getTime();
         	for (AccountBalancesResponse balance : restClient.accountAPI().listAccounts(null, "trade")) {
         		if (baseToken.equalsIgnoreCase(balance.getCurrency())) {
         			baseBalance = balance.getAvailable();
@@ -112,77 +138,123 @@ public class KucoinStrategy {
     private void onLevel2Data(KucoinEvent<Level2Event> event) {
     	LOGGER.debug("{}", event);
         Level2Event data = event.getData();
+        long timestamp = data.getTimestamp();
+
         BigDecimal askPriceLevel = getTargetPriceLevel(data.getAsks());
         BigDecimal bidPriceLevel = getTargetPriceLevel(data.getBids());
+        
         LOGGER.debug("Target ask price: {}", askPriceLevel);
         LOGGER.debug("Target bid price: {}", bidPriceLevel);
         
-        // Jak zjistit, ze jsem posledni v rade na dane price level
-        for (Iterator<Entry<String, Order>> it = orders.entrySet().iterator(); it.hasNext(); ) {
-        	Entry<String, Order> entry = it.next();
+        // TODO do as little computation as possible, if there is no change, no computation
+        if (currentAskPriceLevel.compareTo(askPriceLevel) != 0) {
+        	if (askPriceLevelProposal.compareTo(askPriceLevel) != 0) {
+        		askPriceLevelProposal = askPriceLevel;
+        		askPriceLevelProposalTimestamp = timestamp;
+        	}
+        } else if (askPriceLevelProposal.compareTo(currentAskPriceLevel) != 0) {
+        	askPriceLevelProposal = currentAskPriceLevel;
+        	askPriceLevelProposalTimestamp = Long.MAX_VALUE - priceChangeDelayMs;
+        }
+        
+        if (currentBidPriceLevel.compareTo(bidPriceLevel) != 0) {
+        	bidPriceLevelProposal = bidPriceLevel;
+        	bidPriceLevelProposalTimestamp = timestamp;
+        } else if (bidPriceLevelProposal.compareTo(currentBidPriceLevel) != 0) {
+        	bidPriceLevelProposal = currentBidPriceLevel;
+        	bidPriceLevelProposalTimestamp = Long.MAX_VALUE - priceChangeDelayMs;
+        }
+        
+        if (timestamp >= askPriceLevelProposalTimestamp + priceChangeDelayMs ||
+        		timestamp >= bidPriceLevelProposalTimestamp + priceChangeDelayMs) {
+
+        	currentAskPriceLevel = askPriceLevelProposal;
+        	currentBidPriceLevel = bidPriceLevelProposal;
+        	askPriceLevelProposalTimestamp = Long.MAX_VALUE - priceChangeDelayMs;
+        	bidPriceLevelProposalTimestamp = Long.MAX_VALUE - priceChangeDelayMs;
+        	
+        	executorService.execute(this::processOrderChanges);
+        }
+    }
+    
+    private void processOrderChanges() {
+    	// TODO Jak zjistit, ze jsem posledni v rade na dane price level
+    	Map<String, Order> ordersBeKept = new ConcurrentHashMap<>();
+        for (Entry<String, Order> entry: orders.entrySet()) {
         	Order order = entry.getValue();
-        	if ((BUY.equalsIgnoreCase(order.side()) && order.price().compareTo(bidPriceLevel) != 0)
-        			|| (SELL.equalsIgnoreCase(order.side()) && order.price().compareTo(askPriceLevel) != 0)) {
+        	if ((BUY.equalsIgnoreCase(order.side()) && order.price().compareTo(bidPriceLevelProposal) != 0)
+        			|| (SELL.equalsIgnoreCase(order.side()) && order.price().compareTo(askPriceLevelProposal) != 0)) {
         		try {
         			// Wait for balance update
-        			lastOrderChange = Long.MAX_VALUE;
-        			lastBalanceChange = Long.MAX_VALUE;
+        			waitForBalanceUpdate.incrementAndGet();
+        			
+        			LOGGER.info("Cancelling order {}", order);
 					restClient.orderAPI().cancelOrder(order.orderId());
-					it.remove();
-					LOGGER.info("Cancelling order {}", order);
 				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
+					throw new IllegalStateException("Could not cancel an order " + order.orderId(), e);
 				}
+        	} else {
+        		ordersBeKept.put(entry.getKey(), order);
         	}
+        }
+        orders = ordersBeKept;
+        
+        long timeout = 10000;
+        long endtime = new Date().getTime() + timeout;
+       	while (waitForBalanceUpdate.get() > 0 && new Date().getTime() < endtime) {
+        	try {
+        		synchronized (monitor) {
+        			monitor.wait(timeout);
+        		}
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				throw new IllegalStateException("Thread wait() went wrong", e);
+			}
         }
         
         // Vyuzivam timestamp na zpravach k synchronizaci mezi async udalostmi
-        long timestamp = data.getTimestamp();
-		if (timestamp > lastBalanceChange && timestamp > lastOrderChange) {
 			try {
 				if (baseBalance.compareTo(BigDecimal.ZERO) > 0) {
 					final String clientOrderId = UUID.randomUUID().toString();
+					LOGGER.info("Placing new limit order - clOrdId: {}, side: {}, price: {}, size: {}",
+							clientOrderId, SELL, askPriceLevelProposal, baseBalance);
 					restClient.orderAPI().createOrder(OrderCreateApiRequest.builder()
 							.clientOid(clientOrderId)
 							.side(SELL)
 							.symbol(symbol)
-							.price(askPriceLevel)
+							.price(askPriceLevelProposal)
 							.size(baseBalance)
 							.type(LIMIT)
 							.build());
-					LOGGER.info("Placing new limit order - clOrdId: {}, side: {}, price: {}, size: {}",
-							clientOrderId, SELL, askPriceLevel, baseBalance);
 				} else {
 					LOGGER.info("No new sell orders placed");
 				}
 				
-				BigDecimal balanceQuoteLeftForBids = maxBalanceToUse.subtract(askPriceLevel.multiply(baseBalance));
+				BigDecimal balanceQuoteLeftForBids = maxBalanceToUse.subtract(askPriceLevelProposal.multiply(baseBalance));
 				for (Order order : orders.values()) {
 					balanceQuoteLeftForBids = balanceQuoteLeftForBids.subtract(order.price().multiply(order.size()));
 				}
 				balanceQuoteLeftForBids = balanceQuoteLeftForBids.min(quoteBalance);
 				
-				BigDecimal size = balanceQuoteLeftForBids.divide(bidPriceLevel, 6, RoundingMode.FLOOR);
+				BigDecimal size = balanceQuoteLeftForBids.divide(bidPriceLevelProposal, 4, RoundingMode.FLOOR);
 				if (size.compareTo(BigDecimal.ZERO) > 0) {
 					final String clientOrderId = UUID.randomUUID().toString();
+					LOGGER.info("Placing new limit order - clOrdId: {}, side: {}, price: {}, size: {}",
+							clientOrderId, BUY, bidPriceLevelProposal, size);
 					restClient.orderAPI().createOrder(OrderCreateApiRequest.builder()
 							.clientOid(clientOrderId)
 							.side(BUY)
 							.symbol(symbol)
-							.price(bidPriceLevel)
+							.price(bidPriceLevelProposal)
 							.size(size)
 							.type(LIMIT)
 							.build());
-					LOGGER.info("Placing new limit order - clOrdId: {}, side: {}, price: {}, size: {}",
-							clientOrderId, BUY, bidPriceLevel, size);
 				} else {
 					LOGGER.info("No new buy orders placed");
 				}
 			} catch (IOException e) {
 				throw new IllegalStateException("Could not create orders", e);
 			}
-		}
     }
     
     private BigDecimal getTargetPriceLevel(Object[][] data) {
@@ -201,7 +273,6 @@ public class KucoinStrategy {
     private void onOrderChange(KucoinEvent<OrderChangeEvent> event) {
     	LOGGER.debug("{}", event);
     	OrderChangeEvent data = event.getData();
-    	lastOrderChange = data.getTs();
 		String changeType = data.getType();
 		if (symbol.equalsIgnoreCase(data.getSymbol())) {
     		if ("open".equalsIgnoreCase(changeType)) {
@@ -215,21 +286,22 @@ public class KucoinStrategy {
     			orders.get(data.getOrderId()).size(data.getRemainSize());
     		}
     	}
-		LOGGER.info("Order change: {}, ID: {}, type: {}", lastOrderChange, data.getOrderId(), changeType);
+		LOGGER.info("Order change: {}, ID: {}, type: {}", data.getOrderId(), changeType);
     }
     
     private void onAccountBalance(KucoinEvent<AccountChangeEvent> event) {
     	LOGGER.debug("{}", event);
     	AccountChangeEvent data = event.getData();
-    	lastBalanceChange = Long.parseLong(data.getTime());
+    	waitForBalanceUpdate.updateAndGet(i -> Math.max(0, i - 1));
     	if (baseToken.equalsIgnoreCase(data.getCurrency())) {
 			baseBalance = data.getAvailable();
 		} else if (quoteToken.equalsIgnoreCase(data.getCurrency())) {
 			quoteBalance = data.getAvailable();
 		}
-    	LOGGER.info("Balance change: {}, {}: {}, {}: {}", lastBalanceChange, baseToken, baseBalance,
+    	synchronized (monitor) {
+    		monitor.notifyAll();
+		}
+    	LOGGER.info("Balance change: {}, {}: {}, {}: {}", baseToken, baseBalance,
     			quoteToken, quoteBalance);
-    	
-    	// TODO Calculate new order proposals based on balance and existing orders, respect amount of balance to use
     }
 }

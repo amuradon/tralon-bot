@@ -29,6 +29,6 @@ public class KucoinStrategyFactory {
 	
 	@PostConstruct
 	public void init() {
-		new KucoinStrategy(restClient, wsClientPublic, wsClientPrivate, "VERSE", "USDT", 1000, 100).run();
+		new KucoinStrategy(restClient, wsClientPublic, wsClientPrivate, "VERSE", "USDT", 1000, 100, 5000).run();
 	}
 }
