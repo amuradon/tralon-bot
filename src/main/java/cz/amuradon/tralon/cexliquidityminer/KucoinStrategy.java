@@ -3,11 +3,8 @@ package cz.amuradon.tralon.cexliquidityminer;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.UUID;
@@ -16,7 +13,6 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.kucoin.sdk.KucoinClientBuilder;
 import com.kucoin.sdk.KucoinPrivateWSClient;
 import com.kucoin.sdk.KucoinPublicWSClient;
 import com.kucoin.sdk.KucoinRestClient;
@@ -26,11 +22,6 @@ import com.kucoin.sdk.websocket.event.AccountChangeEvent;
 import com.kucoin.sdk.websocket.event.KucoinEvent;
 import com.kucoin.sdk.websocket.event.Level2Event;
 import com.kucoin.sdk.websocket.event.OrderChangeEvent;
-
-import io.quarkus.runtime.Startup;
-import jakarta.annotation.PostConstruct;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
 
 public class KucoinStrategy {
 	
@@ -166,11 +157,11 @@ public class KucoinStrategy {
 					LOGGER.info("No new sell orders placed");
 				}
 				
-				BigDecimal balanceQuoteLeftForBids = maxBalanceToUse.min(quoteBalance)
-						.subtract(askPriceLevel.multiply(baseBalance));
+				BigDecimal balanceQuoteLeftForBids = maxBalanceToUse.subtract(askPriceLevel.multiply(baseBalance));
 				for (Order order : orders.values()) {
 					balanceQuoteLeftForBids = balanceQuoteLeftForBids.subtract(order.price().multiply(order.size()));
 				}
+				balanceQuoteLeftForBids = balanceQuoteLeftForBids.min(quoteBalance);
 				
 				BigDecimal size = balanceQuoteLeftForBids.divide(bidPriceLevel, 6, RoundingMode.FLOOR);
 				if (size.compareTo(BigDecimal.ZERO) > 0) {
@@ -218,6 +209,7 @@ public class KucoinStrategy {
     		} else if ("filled".equalsIgnoreCase(changeType)) {
     			orders.remove(data.getOrderId());
     		} else if ("cancelled".equalsIgnoreCase(changeType)) {
+    			// The orders are removed immediately once cancelled, this is to cover manual cancel
     			orders.remove(data.getOrderId());
     		} else if ("match".equalsIgnoreCase(changeType)) {
     			orders.get(data.getOrderId()).size(data.getRemainSize());
