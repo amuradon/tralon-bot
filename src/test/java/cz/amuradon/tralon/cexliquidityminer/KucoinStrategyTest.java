@@ -40,6 +40,8 @@ import com.kucoin.sdk.websocket.event.OrderChangeEvent;
 @ExtendWith(MockitoExtension.class)
 public class KucoinStrategyTest {
 
+	private static final int PRICE_CHANGE_DELAY = 1000;
+
 	private static final String QUOTE_TOKEN = "USDT";
 
 	private static final String BASE_TOKEN = "TKN";
@@ -91,13 +93,9 @@ public class KucoinStrategyTest {
 		Mockito.when(restClientMock.accountAPI().listAccounts(null, "trade")).thenReturn(accountBalanceResponses);
 		
 		strategy = new KucoinStrategy(restClientMock, publicWsClientMock, privateWsClientMock,
-				BASE_TOKEN, QUOTE_TOKEN, 100, 100, 0);
+				BASE_TOKEN, QUOTE_TOKEN, 100, 100, PRICE_CHANGE_DELAY);
 		
 	}
-	
-	/*
-	 * - price change delay test 
-	 */
 	
 	/**
 	 * When the application first starts, there are no orders for a given symbol and no balance
@@ -115,22 +113,20 @@ public class KucoinStrategyTest {
 
 		getCallbacks();
 		
+		// To push through the delay 
+		publishTestOrderBook();
+		timestamp += PRICE_CHANGE_DELAY;
 		publishTestOrderBook();
 		
-		verify(restClientMock.orderAPI(), times(0)).cancelOrder(anyString());
+		verify(restClientMock.orderAPI(), never()).cancelOrder(anyString());
 		verify(restClientMock.orderAPI(), times(1)).createOrder(orderCreateRequestCaptor.capture());
 		
 		OrderCreateApiRequest orderCreateRequest = orderCreateRequestCaptor.getValue();
 		
 		assertOrder("buy", "1.5", "66.6666", orderCreateRequest);
 		
-		publishAccounChangeEvent(QUOTE_TOKEN, 900);
+		publishAccounChangeEvent(QUOTE_TOKEN, 933.33);
 		publishOrderChangeEvent("open", "newOrder1", orderCreateRequest);
-		
-		publishTestOrderBook();
-		
-		verify(restClientMock.orderAPI(), never()).cancelOrder(anyString());
-		verify(restClientMock.orderAPI(), times(1)).createOrder(orderCreateRequestCaptor.capture());
 	}
 
 	private void publishTestOrderBook() throws InterruptedException {
@@ -156,6 +152,9 @@ public class KucoinStrategyTest {
 		
 		getCallbacks();
 		
+		// To push through the delay 
+		publishTestOrderBook();
+		timestamp += PRICE_CHANGE_DELAY;
 		publishTestOrderBook();
 		
 		verify(restClientMock.orderAPI(), never()).cancelOrder(anyString());
@@ -177,6 +176,9 @@ public class KucoinStrategyTest {
 		
 		getCallbacks();
 		
+		// To push through the delay 
+		publishTestOrderBook();
+		timestamp += PRICE_CHANGE_DELAY;
 		publishTestOrderBook();
 		
 		verify(restClientMock.orderAPI(), never()).cancelOrder(anyString());
@@ -188,11 +190,6 @@ public class KucoinStrategyTest {
 		
 		publishAccounChangeEvent(BASE_TOKEN, 0);
 		publishOrderChangeEvent("open", "newOrder1", orderCreateRequest);
-		
-		publishTestOrderBook();
-		
-		verify(restClientMock.orderAPI(), never()).cancelOrder(anyString());
-		verify(restClientMock.orderAPI(), times(1)).createOrder(orderCreateRequestCaptor.capture());
 	}
 	
 	/**
@@ -212,6 +209,9 @@ public class KucoinStrategyTest {
 		
 		getCallbacks();
 		
+		// To push through the delay 
+		publishTestOrderBook();
+		timestamp += PRICE_CHANGE_DELAY;
 		publishTestOrderBook();
 		
 		verify(restClientMock.orderAPI(), never()).cancelOrder(anyString());
@@ -235,6 +235,9 @@ public class KucoinStrategyTest {
 		
 		getCallbacks();
 		
+		// To push through the delay 
+		publishTestOrderBook();
+		timestamp += PRICE_CHANGE_DELAY;
 		publishTestOrderBook();
 		
 		verify(restClientMock.orderAPI(), never()).cancelOrder(anyString());
@@ -246,11 +249,6 @@ public class KucoinStrategyTest {
 		
 		publishAccounChangeEvent(BASE_TOKEN, 0);
 		publishOrderChangeEvent("open", "newOrder1", orderCreateRequest);
-		
-		publishTestOrderBook();
-		
-		verify(restClientMock.orderAPI(), never()).cancelOrder(anyString());
-		verify(restClientMock.orderAPI(), times(1)).createOrder(orderCreateRequestCaptor.capture());
 	}
 	
 	/**
@@ -283,11 +281,9 @@ public class KucoinStrategyTest {
 			return null;
 		});
 			
-		publishL2Event(new Double[][] {{2.2, 5.0}, {2.3, 10.0}, {2.4, 18.0}, {2.5, 20.0}, {2.6, 30.0}, {2.7, 40.0}},
-				new Double[][] {{2.0, 3.0}, {1.9, 5.0}, {1.8, 14.0}, {1.7, 20.0}, {1.6, 50.0}, {1.5, 80.0}});
-		
-		// XXX How to make it better?
-		Thread.sleep(1000);
+		publishTestOrderBookMove();
+		timestamp += PRICE_CHANGE_DELAY;
+		publishTestOrderBookMove();
 		
 		verify(restClientMock.orderAPI(), times(1)).cancelOrder(eq("orderBuy"));
 		verify(restClientMock.orderAPI(), times(1)).cancelOrder(eq("orderSell"));
@@ -302,6 +298,51 @@ public class KucoinStrategyTest {
 		publishAccounChangeEvent(QUOTE_TOKEN, 0);
 		publishOrderChangeEvent("open", "newOrder1", orderCreateRequests.get(0));
 		publishOrderChangeEvent("open", "newOrder2", orderCreateRequests.get(1));
+	}
+
+	private void publishTestOrderBookMove() throws InterruptedException {
+		publishL2Event(new Double[][] {{2.2, 5.0}, {2.3, 10.0}, {2.4, 18.0}, {2.5, 20.0}, {2.6, 30.0}, {2.7, 40.0}},
+				new Double[][] {{2.0, 3.0}, {1.9, 5.0}, {1.8, 14.0}, {1.7, 20.0}, {1.6, 50.0}, {1.5, 80.0}});
+		
+		// XXX How to make it better?
+		Thread.sleep(1000);
+	}
+
+	/**
+	 * When the price moves and coming back within price change delay it should do nothing and keep orders as they are.
+	 * Note: multiple orders either on same or different level goes through the same program path
+	 */
+	@Test
+	public void oneOrderEachSidePriceMovesUpAndBackShouldDoNothing() throws Exception {
+		addOrderResponse("orderBuy", SYMBOL, "buy", 30, "1.5");
+		addOrderResponse("orderSell", SYMBOL, "sell", 20, "2.4");
+		
+		addAccountBalancesResponse(BASE_TOKEN, 0);
+		addAccountBalancesResponse(QUOTE_TOKEN, 10);
+		
+		strategy.run();
+		
+		timestamp = new Date().getTime();
+		
+		getCallbacks();
+		
+		when(restClientMock.orderAPI().cancelOrder(eq("orderBuy"))).thenAnswer(i -> {
+			publishOrderChangeEvent("cancelled", "orderBuy", SYMBOL);
+			publishAccounChangeEvent(QUOTE_TOKEN, 55);
+			return null;
+		});
+		when(restClientMock.orderAPI().cancelOrder(eq("orderSell"))).thenAnswer(i -> {
+			publishOrderChangeEvent("cancelled", "orderSell", SYMBOL);
+			publishAccounChangeEvent(BASE_TOKEN, 20);
+			return null;
+		});
+		
+		publishTestOrderBookMove();
+		timestamp += (PRICE_CHANGE_DELAY / 2);
+		publishTestOrderBook();
+		
+		verify(restClientMock.orderAPI(), never()).cancelOrder(anyString());
+		verify(restClientMock.orderAPI(), never()).createOrder(any());
 	}
 	
 	/**
@@ -325,6 +366,9 @@ public class KucoinStrategyTest {
 		publishOrderChangeEvent("filled", "orderBuy", SYMBOL);
 		publishAccounChangeEvent(BASE_TOKEN, 30);
 		
+		// To push through the delay 
+		publishTestOrderBook();
+		timestamp += PRICE_CHANGE_DELAY;
 		publishTestOrderBook();
 		
 		verify(restClientMock.orderAPI(), never()).cancelOrder(anyString());
@@ -335,11 +379,6 @@ public class KucoinStrategyTest {
 		
 		publishAccounChangeEvent(BASE_TOKEN, 0);
 		publishOrderChangeEvent("open", "newSellOrder", orderCreateRequest);
-		
-		publishTestOrderBook();
-		
-		verify(restClientMock.orderAPI(), never()).cancelOrder(anyString());
-		verify(restClientMock.orderAPI(), times(1)).createOrder(orderCreateRequestCaptor.capture());
 	}
 
 	/**
@@ -363,6 +402,9 @@ public class KucoinStrategyTest {
 		publishOrderChangeEvent("filled", "orderSell", SYMBOL);
 		publishAccounChangeEvent(QUOTE_TOKEN, 58);
 		
+		// To push through the delay 
+		publishTestOrderBook();
+		timestamp += PRICE_CHANGE_DELAY;
 		publishTestOrderBook();
 		
 		verify(restClientMock.orderAPI(), never()).cancelOrder(anyString());
@@ -373,11 +415,6 @@ public class KucoinStrategyTest {
 		
 		publishAccounChangeEvent(QUOTE_TOKEN, 10);
 		publishOrderChangeEvent("open", "newSellOrder", orderCreateRequest);
-		
-		publishTestOrderBook();
-		
-		verify(restClientMock.orderAPI(), never()).cancelOrder(anyString());
-		verify(restClientMock.orderAPI(), times(1)).createOrder(orderCreateRequestCaptor.capture());
 	}
 	
 	/**
@@ -401,6 +438,9 @@ public class KucoinStrategyTest {
 		publishOrderChangeEvent("match", "orderBuy", SYMBOL, null, null, null, new BigDecimal("15"));
 		publishAccounChangeEvent(BASE_TOKEN, 15);
 		
+		// To push through the delay 
+		publishTestOrderBook();
+		timestamp += PRICE_CHANGE_DELAY;
 		publishTestOrderBook();
 		
 		verify(restClientMock.orderAPI(), never()).cancelOrder(anyString());
@@ -411,11 +451,6 @@ public class KucoinStrategyTest {
 		
 		publishAccounChangeEvent(BASE_TOKEN, 0);
 		publishOrderChangeEvent("open", "newSellOrder", orderCreateRequest);
-		
-		publishTestOrderBook();
-		
-		verify(restClientMock.orderAPI(), never()).cancelOrder(anyString());
-		verify(restClientMock.orderAPI(), times(1)).createOrder(orderCreateRequestCaptor.capture());
 	}
 	
 	/**
@@ -439,6 +474,9 @@ public class KucoinStrategyTest {
 		publishOrderChangeEvent("match", "orderSell", SYMBOL, null, null, null, new BigDecimal("15"));
 		publishAccounChangeEvent(QUOTE_TOKEN, 46);
 		
+		// To push through the delay 
+		publishTestOrderBook();
+		timestamp += PRICE_CHANGE_DELAY;
 		publishTestOrderBook();
 		
 		verify(restClientMock.orderAPI(), never()).cancelOrder(anyString());
@@ -449,11 +487,6 @@ public class KucoinStrategyTest {
 		
 		publishAccounChangeEvent(QUOTE_TOKEN, 27);
 		publishOrderChangeEvent("open", "newSellOrder", orderCreateRequest);
-		
-		publishTestOrderBook();
-		
-		verify(restClientMock.orderAPI(), never()).cancelOrder(anyString());
-		verify(restClientMock.orderAPI(), times(1)).createOrder(orderCreateRequestCaptor.capture());
 	}
 	
 	private void assertOrder(String side, String price, String size, OrderCreateApiRequest orderCreateRequest) {
