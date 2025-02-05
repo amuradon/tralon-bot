@@ -4,8 +4,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -22,14 +24,16 @@ import org.mockito.Answers;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 import com.kucoin.sdk.KucoinPrivateWSClient;
 import com.kucoin.sdk.KucoinPublicWSClient;
 import com.kucoin.sdk.KucoinRestClient;
 import com.kucoin.sdk.rest.request.OrderCreateApiRequest;
 import com.kucoin.sdk.rest.response.AccountBalancesResponse;
+import com.kucoin.sdk.rest.response.OrderCreateResponse;
 import com.kucoin.sdk.rest.response.OrderResponse;
 import com.kucoin.sdk.websocket.KucoinAPICallback;
 import com.kucoin.sdk.websocket.event.AccountChangeEvent;
@@ -38,7 +42,12 @@ import com.kucoin.sdk.websocket.event.Level2Event;
 import com.kucoin.sdk.websocket.event.OrderChangeEvent;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 public class KucoinStrategyTest {
+
+	private static final String NEW_ORDER_ID2 = "newOrder2";
+
+	private static final String NEW_ORDER_ID1 = "newOrder1";
 
 	private static final int PRICE_CHANGE_DELAY = 1000;
 
@@ -57,6 +66,12 @@ public class KucoinStrategyTest {
 	@Mock
 	private KucoinPublicWSClient publicWsClientMock;
 	
+	@Mock
+	private OrderCreateResponse orderCreateResponseMock1;
+	
+	@Mock
+	private OrderCreateResponse orderCreateResponseMock2;
+
 	@Captor
 	private ArgumentCaptor<KucoinAPICallback<KucoinEvent<Level2Event>>> l2EventCallbackCaptor;
 
@@ -83,14 +98,19 @@ public class KucoinStrategyTest {
 	
 	private long timestamp;
 	
+	
 	@BeforeEach
 	public void prepare() throws IOException {
 		orderResponses = new ArrayList<>();
-		Mockito.when(restClientMock.orderAPI().listOrders(anyString(), any(), any(), any(),
+		when(restClientMock.orderAPI().listOrders(anyString(), any(), any(), any(),
 				anyString(), any(), any(), anyInt(), anyInt()).getItems()).thenReturn(orderResponses);
 		
 		accountBalanceResponses = new ArrayList<>();
-		Mockito.when(restClientMock.accountAPI().listAccounts(null, "trade")).thenReturn(accountBalanceResponses);
+		when(restClientMock.accountAPI().listAccounts(null, "trade")).thenReturn(accountBalanceResponses);
+		
+		when(orderCreateResponseMock1.getOrderId()).thenReturn(NEW_ORDER_ID1);
+		when(orderCreateResponseMock2.getOrderId()).thenReturn(NEW_ORDER_ID2);
+		when(restClientMock.orderAPI().createOrder(any())).thenReturn(orderCreateResponseMock1, orderCreateResponseMock2);
 		
 		strategy = new KucoinStrategy(restClientMock, publicWsClientMock, privateWsClientMock,
 				BASE_TOKEN, QUOTE_TOKEN, 100, 100, PRICE_CHANGE_DELAY);
@@ -126,15 +146,7 @@ public class KucoinStrategyTest {
 		assertOrder("buy", "1.5", "66.6666", orderCreateRequest);
 		
 		publishAccounChangeEvent(QUOTE_TOKEN, 933.33);
-		publishOrderChangeEvent("open", "newOrder1", orderCreateRequest);
-	}
-
-	private void publishTestOrderBook() throws InterruptedException {
-		publishL2Event(new Double[][] {{2.1, 5.0}, {2.2, 10.0}, {2.3, 18.0}, {2.4, 20.0}, {2.5, 30.0}, {2.6, 40.0}},
-				new Double[][] {{1.9, 3.0}, {1.8, 5.0}, {1.7, 14.0}, {1.6, 20.0}, {1.5, 50.0}, {1.4, 80.0}});
-		
-		// XXX How to make it better?
-		Thread.sleep(1000);
+		publishOrderChangeEvent("open", NEW_ORDER_ID1, orderCreateRequest);
 	}
 
 	/**
@@ -189,7 +201,7 @@ public class KucoinStrategyTest {
 		assertOrder("sell", "2.4", "100", orderCreateRequest);
 		
 		publishAccounChangeEvent(BASE_TOKEN, 0);
-		publishOrderChangeEvent("open", "newOrder1", orderCreateRequest);
+		publishOrderChangeEvent("open", NEW_ORDER_ID1, orderCreateRequest);
 	}
 	
 	/**
@@ -248,7 +260,7 @@ public class KucoinStrategyTest {
 		assertOrder("sell", "2.4", "10", orderCreateRequest);
 		
 		publishAccounChangeEvent(BASE_TOKEN, 0);
-		publishOrderChangeEvent("open", "newOrder1", orderCreateRequest);
+		publishOrderChangeEvent("open", NEW_ORDER_ID1, orderCreateRequest);
 	}
 	
 	/**
@@ -296,10 +308,18 @@ public class KucoinStrategyTest {
 		
 		publishAccounChangeEvent(BASE_TOKEN, 0);
 		publishAccounChangeEvent(QUOTE_TOKEN, 0);
-		publishOrderChangeEvent("open", "newOrder1", orderCreateRequests.get(0));
-		publishOrderChangeEvent("open", "newOrder2", orderCreateRequests.get(1));
+		publishOrderChangeEvent("open", NEW_ORDER_ID1, orderCreateRequests.get(0));
+		publishOrderChangeEvent("open", NEW_ORDER_ID2, orderCreateRequests.get(1));
 	}
 
+	private void publishTestOrderBook() throws InterruptedException {
+		publishL2Event(new Double[][] {{2.1, 5.0}, {2.2, 10.0}, {2.3, 18.0}, {2.4, 20.0}, {2.5, 30.0}, {2.6, 40.0}},
+				new Double[][] {{1.9, 3.0}, {1.8, 5.0}, {1.7, 14.0}, {1.6, 20.0}, {1.5, 50.0}, {1.4, 80.0}});
+		
+		// XXX How to make it better?
+		Thread.sleep(1000);
+	}
+	
 	private void publishTestOrderBookMove() throws InterruptedException {
 		publishL2Event(new Double[][] {{2.2, 5.0}, {2.3, 10.0}, {2.4, 18.0}, {2.5, 20.0}, {2.6, 30.0}, {2.7, 40.0}},
 				new Double[][] {{2.0, 3.0}, {1.9, 5.0}, {1.8, 14.0}, {1.7, 20.0}, {1.6, 50.0}, {1.5, 80.0}});
@@ -487,6 +507,41 @@ public class KucoinStrategyTest {
 		
 		publishAccounChangeEvent(QUOTE_TOKEN, 27);
 		publishOrderChangeEvent("open", "newSellOrder", orderCreateRequest);
+	}
+
+	/**
+	 * #5 bug placing more orders than maximum allowed, up to twice, because of asynchronous nature
+	 * when base balance = 0 change came between placing sell orders and calculating available
+	 * balance for buy orders what caused the calculation to think no sell orders are open.
+	 */
+	@Test
+	public void noOrders() throws Exception {
+		addAccountBalancesResponse(BASE_TOKEN, 70);
+		addAccountBalancesResponse(QUOTE_TOKEN, 1000);
+		
+		strategy.run();
+		
+		timestamp = new Date().getTime();
+		
+		getCallbacks();
+		
+		when(restClientMock.orderAPI().createOrder(any())).thenAnswer(i -> {
+			publishAccounChangeEvent(BASE_TOKEN, 0);
+			return orderCreateResponseMock1;
+		});
+		
+		// To push through the delay 
+		publishTestOrderBook();
+		timestamp += PRICE_CHANGE_DELAY;
+		publishTestOrderBook();
+		
+		verify(restClientMock.orderAPI(), never()).cancelOrder(anyString());
+		verify(restClientMock.orderAPI(), times(1)).createOrder(orderCreateRequestCaptor.capture());
+		
+		OrderCreateApiRequest orderCreateRequest = orderCreateRequestCaptor.getValue();
+		
+		assertOrder("sell", "2.4", "70", orderCreateRequest);
+		publishOrderChangeEvent("open", NEW_ORDER_ID1, orderCreateRequest);
 	}
 	
 	private void assertOrder(String side, String price, String size, OrderCreateApiRequest orderCreateRequest) {

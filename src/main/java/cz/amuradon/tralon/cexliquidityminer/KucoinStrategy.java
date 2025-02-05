@@ -21,6 +21,7 @@ import com.kucoin.sdk.KucoinPublicWSClient;
 import com.kucoin.sdk.KucoinRestClient;
 import com.kucoin.sdk.rest.request.OrderCreateApiRequest;
 import com.kucoin.sdk.rest.response.AccountBalancesResponse;
+import com.kucoin.sdk.rest.response.OrderCreateResponse;
 import com.kucoin.sdk.websocket.event.AccountChangeEvent;
 import com.kucoin.sdk.websocket.event.KucoinEvent;
 import com.kucoin.sdk.websocket.event.Level2Event;
@@ -185,7 +186,7 @@ public class KucoinStrategy {
         	if ((BUY.equalsIgnoreCase(order.side()) && order.price().compareTo(bidPriceLevelProposal) != 0)
         			|| (SELL.equalsIgnoreCase(order.side()) && order.price().compareTo(askPriceLevelProposal) != 0)) {
         		try {
-        			// Wait for balance update
+        			// Wait for balance updates
         			waitForBalanceUpdate.incrementAndGet();
         			
         			LOGGER.info("Cancelling order {}", order);
@@ -211,50 +212,55 @@ public class KucoinStrategy {
 				throw new IllegalStateException("Thread wait() went wrong", e);
 			}
         }
+       	
+       	// It needs to use the current snapshot of balance as async events can change it intra-processing
+       	final BigDecimal baseBalanceSnapshot = baseBalance;
+       	final BigDecimal quoteBalanceSnapshot = quoteBalance;
         
-        // Vyuzivam timestamp na zpravach k synchronizaci mezi async udalostmi
-			try {
-				if (baseBalance.compareTo(BigDecimal.ZERO) > 0) {
-					final String clientOrderId = UUID.randomUUID().toString();
-					LOGGER.info("Placing new limit order - clOrdId: {}, side: {}, price: {}, size: {}",
-							clientOrderId, SELL, askPriceLevelProposal, baseBalance);
-					restClient.orderAPI().createOrder(OrderCreateApiRequest.builder()
-							.clientOid(clientOrderId)
-							.side(SELL)
-							.symbol(symbol)
-							.price(askPriceLevelProposal)
-							.size(baseBalance)
-							.type(LIMIT)
-							.build());
-				} else {
-					LOGGER.info("No new sell orders placed");
-				}
-				
-				BigDecimal balanceQuoteLeftForBids = maxBalanceToUse.subtract(askPriceLevelProposal.multiply(baseBalance));
-				for (Order order : orders.values()) {
-					balanceQuoteLeftForBids = balanceQuoteLeftForBids.subtract(order.price().multiply(order.size()));
-				}
-				balanceQuoteLeftForBids = balanceQuoteLeftForBids.min(quoteBalance);
-				
-				BigDecimal size = balanceQuoteLeftForBids.divide(bidPriceLevelProposal, 4, RoundingMode.FLOOR);
-				if (size.compareTo(BigDecimal.ZERO) > 0) {
-					final String clientOrderId = UUID.randomUUID().toString();
-					LOGGER.info("Placing new limit order - clOrdId: {}, side: {}, price: {}, size: {}",
-							clientOrderId, BUY, bidPriceLevelProposal, size);
-					restClient.orderAPI().createOrder(OrderCreateApiRequest.builder()
-							.clientOid(clientOrderId)
-							.side(BUY)
-							.symbol(symbol)
-							.price(bidPriceLevelProposal)
-							.size(size)
-							.type(LIMIT)
-							.build());
-				} else {
-					LOGGER.info("No new buy orders placed");
-				}
-			} catch (IOException e) {
-				throw new IllegalStateException("Could not create orders", e);
+		try {
+			if (baseBalanceSnapshot.compareTo(BigDecimal.ZERO) > 0) {
+				final String clientOrderId = UUID.randomUUID().toString();
+				LOGGER.info("Placing new limit order - clOrdId: {}, side: {}, price: {}, size: {}",
+						clientOrderId, SELL, askPriceLevelProposal, baseBalanceSnapshot);
+				OrderCreateResponse response = restClient.orderAPI().createOrder(OrderCreateApiRequest.builder()
+						.clientOid(clientOrderId)
+						.side(SELL)
+						.symbol(symbol)
+						.price(askPriceLevelProposal)
+						.size(baseBalanceSnapshot)
+						.type(LIMIT)
+						.build());
+				orders.put(response.getOrderId(), new Order(response.getOrderId(), SELL, baseBalanceSnapshot, askPriceLevelProposal));
+			} else {
+				LOGGER.info("No new sell orders placed");
 			}
+			
+			BigDecimal balanceQuoteLeftForBids = maxBalanceToUse;
+			for (Order order : orders.values()) {
+				balanceQuoteLeftForBids = balanceQuoteLeftForBids.subtract(order.price().multiply(order.size()));
+			}
+			balanceQuoteLeftForBids = balanceQuoteLeftForBids.min(quoteBalanceSnapshot);
+			
+			BigDecimal size = balanceQuoteLeftForBids.divide(bidPriceLevelProposal, 4, RoundingMode.FLOOR);
+			if (size.compareTo(BigDecimal.ZERO) > 0) {
+				final String clientOrderId = UUID.randomUUID().toString();
+				LOGGER.info("Placing new limit order - clOrdId: {}, side: {}, price: {}, size: {}",
+						clientOrderId, BUY, bidPriceLevelProposal, size);
+				OrderCreateResponse response = restClient.orderAPI().createOrder(OrderCreateApiRequest.builder()
+						.clientOid(clientOrderId)
+						.side(BUY)
+						.symbol(symbol)
+						.price(bidPriceLevelProposal)
+						.size(size)
+						.type(LIMIT)
+						.build());
+				orders.put(response.getOrderId(), new Order(response.getOrderId(), BUY, size, bidPriceLevelProposal));
+			} else {
+				LOGGER.info("No new buy orders placed");
+			}
+		} catch (IOException e) {
+			throw new IllegalStateException("Could not create orders", e);
+		}
     }
     
     private BigDecimal getTargetPriceLevel(Object[][] data) {
@@ -275,6 +281,9 @@ public class KucoinStrategy {
     	OrderChangeEvent data = event.getData();
 		String changeType = data.getType();
 		if (symbol.equalsIgnoreCase(data.getSymbol())) {
+			// Open order are added and cancelled are removed immediately when request sent over REST API
+			// but this is to sync server state as well as record any manual intervention
+			
     		if ("open".equalsIgnoreCase(changeType)) {
     			orders.put(data.getOrderId(), new Order(data.getOrderId(), data.getSide(), data.getSize(), data.getPrice()));
     		} else if ("filled".equalsIgnoreCase(changeType)) {
@@ -287,6 +296,7 @@ public class KucoinStrategy {
     		}
     	}
 		LOGGER.info("Order change: {}, ID: {}, type: {}", data.getOrderId(), changeType);
+		LOGGER.info("Orders in memory {}", orders);
     }
     
     private void onAccountBalance(KucoinEvent<AccountChangeEvent> event) {
