@@ -1,17 +1,16 @@
 package cz.amuradon.tralon.cexliquidityminer;
 
+import org.apache.camel.ProducerTemplate;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import com.kucoin.sdk.KucoinPrivateWSClient;
 import com.kucoin.sdk.KucoinPublicWSClient;
 import com.kucoin.sdk.KucoinRestClient;
 
-import io.quarkus.runtime.Startup;
-import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
-@Startup
+
 @ApplicationScoped
 public class KucoinStrategyFactory {
 
@@ -31,6 +30,8 @@ public class KucoinStrategyFactory {
 	
 	private final int priceChangeDelayMs;
 	
+	private final ProducerTemplate producerTemplate;
+	
 	@Inject
     public KucoinStrategyFactory(final KucoinRestClient restClient,
     		final KucoinPublicWSClient wsClientPublic,
@@ -39,7 +40,8 @@ public class KucoinStrategyFactory {
     		@ConfigProperty(name = "quoteToken") String quoteToken,
     		@ConfigProperty(name = "orderBookQuoteVolumeBefore") int orderBookQuoteVolumeBefore,
     		@ConfigProperty(name = "maxQuoteBalanceToUse") int maxQuoteBalanceToUse,
-    		@ConfigProperty(name = "priceChangeDelayMs") int priceChangeDelayMs
+    		@ConfigProperty(name = "priceChangeDelayMs") int priceChangeDelayMs,
+    		final ProducerTemplate producerTemplate
     ) {
 		this.restClient = restClient;
 		this.wsClientPublic = wsClientPublic;
@@ -49,11 +51,11 @@ public class KucoinStrategyFactory {
 		this.orderBookQuoteVolumeBefore = orderBookQuoteVolumeBefore;
 		this.maxQuoteBalanceToUse = maxQuoteBalanceToUse;
 		this.priceChangeDelayMs = priceChangeDelayMs;
+		this.producerTemplate = producerTemplate;
     }
 	
-	@PostConstruct
-	public void init() {
-		new KucoinStrategy(restClient, wsClientPublic, wsClientPrivate, baseToken, quoteToken,
-				orderBookQuoteVolumeBefore, maxQuoteBalanceToUse, priceChangeDelayMs).run();
+	public KucoinStrategy create() {
+		return new KucoinStrategy(restClient, wsClientPublic, wsClientPrivate, baseToken, quoteToken,
+				orderBookQuoteVolumeBefore, maxQuoteBalanceToUse, priceChangeDelayMs, producerTemplate);
 	}
 }

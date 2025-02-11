@@ -3,16 +3,23 @@ package cz.amuradon.tralon.cexliquidityminer;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.SortedMap;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
+import org.apache.camel.ProducerTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,9 +28,11 @@ import com.kucoin.sdk.KucoinPublicWSClient;
 import com.kucoin.sdk.KucoinRestClient;
 import com.kucoin.sdk.rest.request.OrderCreateApiRequest;
 import com.kucoin.sdk.rest.response.AccountBalancesResponse;
+import com.kucoin.sdk.rest.response.OrderBookResponse;
 import com.kucoin.sdk.rest.response.OrderCreateResponse;
 import com.kucoin.sdk.websocket.event.AccountChangeEvent;
 import com.kucoin.sdk.websocket.event.KucoinEvent;
+import com.kucoin.sdk.websocket.event.Level2ChangeEvent;
 import com.kucoin.sdk.websocket.event.Level2Event;
 import com.kucoin.sdk.websocket.event.OrderChangeEvent;
 
@@ -70,11 +79,13 @@ public class KucoinStrategy {
 	
 	private final Object monitor;
 	
+	private final ProducerTemplate producer;
+	
     private Map<String, Order> orders;
     
-    private BigDecimal baseBalance = BigDecimal.ZERO;
+    private BigDecimal baseBalance;
     
-    private BigDecimal quoteBalance = BigDecimal.ZERO;
+    private BigDecimal quoteBalance;
     
     private BigDecimal currentBidPriceLevel;
     
@@ -93,7 +104,7 @@ public class KucoinStrategy {
     public KucoinStrategy(final KucoinRestClient restClient, final KucoinPublicWSClient wsClientPublic,
     		final KucoinPrivateWSClient wsClientPrivate, final String baseToken, final String quoteToken,
     		final int sideVolumeThreshold, final int maxBalanceToUse,
-    		final int priceChangeDelayMs) {
+    		final int priceChangeDelayMs, final ProducerTemplate producer) {
 		this.restClient = restClient;
 		this.wsClientPublic = wsClientPublic;
 		this.wsClientPrivate = wsClientPrivate;
@@ -105,6 +116,9 @@ public class KucoinStrategy {
 		this.priceChangeDelayMs = priceChangeDelayMs;
 		this.executorService = Executors.newSingleThreadExecutor();
 		this.monitor = new Object();
+		this.producer = producer;
+		baseBalance = BigDecimal.ZERO;
+	    quoteBalance = BigDecimal.ZERO;
 		currentBidPriceLevel = BigDecimal.ZERO;
 		currentAskPriceLevel = BigDecimal.ZERO;
 		bidPriceLevelProposal = BigDecimal.ZERO;
@@ -128,13 +142,45 @@ public class KucoinStrategy {
         	LOGGER.info("Available base balance {}: {}", baseToken, baseBalance);
         	LOGGER.info("Available quote balance {}: {}", quoteToken, quoteBalance);
         	
-            wsClientPublic.onLevel2Data(50, this::onLevel2Data, symbol);
-            wsClientPrivate.onOrderChange(this::onOrderChange);
-            wsClientPrivate.onAccountBalance(this::onAccountBalance);
+//            wsClientPublic.onLevel2Data(50, this::onLevel2Data, symbol);
+//            wsClientPrivate.onOrderChange(this::onOrderChange);
+//            wsClientPrivate.onAccountBalance(this::onAccountBalance);
+        	wsClientPublic.onLevel2Data(this::onL2RT, symbol);
+
+        	OrderBookResponse orderBookResponse = restClient.orderBookAPI().getAllLevel2OrderBook(symbol);
+        	LOGGER.info("Order Book response: seq {}\nAsks:\n{}\nBids:\n{}", orderBookResponse.getSequence(),
+        			orderBookResponse.getAsks(), orderBookResponse.getBids());
+        	OrderBook orderBook = new OrderBook(Long.parseLong(orderBookResponse.getSequence()),
+        			getOrderBookSide(orderBookResponse.getAsks(), Comparator.naturalOrder()),
+        			getOrderBookSide(orderBookResponse.getBids(), Comparator.reverseOrder()));
+        	producer.sendBody(MyRouteBuilder.DIRECT_ORDER_BOOK_SNAPSHOT, orderBook);
         } catch (IOException e) {
             throw new IllegalStateException("Could not be initiated.", e);
         }
     }
+    
+    private Map<BigDecimal, BigDecimal> getOrderBookSide(List<List<String>> list, Comparator<BigDecimal> comparator) {
+    	final Map<BigDecimal, BigDecimal> map = new ConcurrentSkipListMap<>(comparator);
+    	for (List<String> element : list) {
+			map.put(new BigDecimal(element.get(0)), new BigDecimal(element.get(1)));
+		}
+    	return map;
+    }
+
+    // FIXME for some reason Kucoin sends updates with lower SELL prices that are not on their order book!!!
+    private void onL2RT(KucoinEvent<Level2ChangeEvent> event) {
+    	System.out.println("EVENT update " + event);
+    	event.getData().getChanges().getAsks().stream().forEach(l -> producer.sendBody(
+    			MyRouteBuilder.SEDA_LEVEL2_MARKET_UPDATE,
+    			new OrderBookUpdate(Long.parseLong(l.get(2)), new BigDecimal(l.get(0)),
+    					new BigDecimal(l.get(1)), Side.SELL)));
+    	event.getData().getChanges().getBids().stream().forEach(l -> producer.sendBody(
+    			MyRouteBuilder.SEDA_LEVEL2_MARKET_UPDATE,
+    			new OrderBookUpdate(Long.parseLong(l.get(2)), new BigDecimal(l.get(0)),
+    					new BigDecimal(l.get(1)), Side.SELL)));
+    }
+    
+    
 
     private void onLevel2Data(KucoinEvent<Level2Event> event) {
     	LOGGER.debug("{}", event);

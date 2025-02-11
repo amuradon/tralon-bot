@@ -3,12 +3,15 @@ package cz.amuradon.tralon.cexliquidityminer;
 
 import java.io.IOException;
 
+import org.apache.camel.spi.CamelEvent.CamelContextStartedEvent;
+
 import com.kucoin.sdk.KucoinClientBuilder;
 import com.kucoin.sdk.KucoinPrivateWSClient;
 import com.kucoin.sdk.KucoinPublicWSClient;
 import com.kucoin.sdk.KucoinRestClient;
 
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Observes;
 import jakarta.enterprise.inject.Produces;
 import jakarta.inject.Inject;
 
@@ -17,8 +20,11 @@ public class BeanConfig {
 
 	private final KucoinClientBuilder kucoinClientBuilder;
 	
+	private final KucoinStrategyFactory strategyFactory;
+	
 	@Inject
-	public BeanConfig() {
+	public BeanConfig(final KucoinStrategyFactory strategyFactory) {
+		this.strategyFactory = strategyFactory;
 		kucoinClientBuilder = new KucoinClientBuilder().withBaseUrl("https://openapi-v2.kucoin.com")
                 .withApiKey("679ca3116425d800012adbc2", "94149a7a-69c8-4647-95b0-a83fc36933e5", "K1986dub27");
 	}
@@ -44,5 +50,9 @@ public class BeanConfig {
 		} catch (IOException e) {
 			throw new IllegalStateException("Could not build public WS client", e);
 		}
+    }
+
+    public void onCamelContextStarted(@Observes CamelContextStartedEvent event) {
+        strategyFactory.create().run();
     }
 }

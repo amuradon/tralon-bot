@@ -16,6 +16,7 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 
+import org.apache.camel.ProducerTemplate;
 import org.junit.Assert;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -71,6 +72,9 @@ public class KucoinStrategyTest {
 	
 	@Mock
 	private OrderCreateResponse orderCreateResponseMock2;
+	
+	@Mock
+	private ProducerTemplate producerTemplateMock;
 
 	@Captor
 	private ArgumentCaptor<KucoinAPICallback<KucoinEvent<Level2Event>>> l2EventCallbackCaptor;
@@ -113,7 +117,7 @@ public class KucoinStrategyTest {
 		when(restClientMock.orderAPI().createOrder(any())).thenReturn(orderCreateResponseMock1, orderCreateResponseMock2);
 		
 		strategy = new KucoinStrategy(restClientMock, publicWsClientMock, privateWsClientMock,
-				BASE_TOKEN, QUOTE_TOKEN, 100, 100, PRICE_CHANGE_DELAY);
+				BASE_TOKEN, QUOTE_TOKEN, 100, 100, PRICE_CHANGE_DELAY, producerTemplateMock);
 		
 	}
 	
