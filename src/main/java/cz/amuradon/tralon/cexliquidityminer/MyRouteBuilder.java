@@ -7,23 +7,32 @@ import jakarta.enterprise.context.ApplicationScoped;
 @ApplicationScoped
 public class MyRouteBuilder extends EndpointRouteBuilder {
 
-	public static final String DIRECT_ORDER_BOOK_SNAPSHOT = "direct:orderBookSnapshot";
+	public static final String DIRECT_START_L2_MARKET_UPDATE_ROUTE = "direct:startL2MarketUpdateRoute";
 
-	public static final String ROUTE_ID_LEVEL2_MARKET_UPDATE = "level2MarketUpdate";
+	public static final String LEVEL2_MARKET_UPDATE = "level2MarketUpdate";
 	
-	public static final String SEDA_LEVEL2_MARKET_UPDATE = "seda:" + ROUTE_ID_LEVEL2_MARKET_UPDATE;
+	public static final String SEDA_LEVEL2_MARKET_UPDATE = "seda:" + LEVEL2_MARKET_UPDATE;
+	
+	private static final String PROCESS_ORDER_CHANGES = "processOrderChanges";
+	
+	public static final String SEDA_PROCESS_ORDER_CHANGES = "seda:" + PROCESS_ORDER_CHANGES;
+	
 	
 	
 	@Override
 	public void configure() throws Exception {
-		from(DIRECT_ORDER_BOOK_SNAPSHOT)
-			.bean(OrderBookManager.BEAN_NAME, "processOrderBook")
-			.to("controlbus:route?routeId=" + ROUTE_ID_LEVEL2_MARKET_UPDATE + "&action=start");
+		// XXX How to start it through Camel Context not using one-time route
+		from(DIRECT_START_L2_MARKET_UPDATE_ROUTE)
+			.to("controlbus:route?routeId=" + LEVEL2_MARKET_UPDATE + "&action=start");
 		
 		from(SEDA_LEVEL2_MARKET_UPDATE)
-			.routeId(ROUTE_ID_LEVEL2_MARKET_UPDATE)
+			.routeId(LEVEL2_MARKET_UPDATE)
 			.autoStartup(false)
 			.bean(OrderBookManager.BEAN_NAME, "processUpdate");
+		
+		from(SEDA_PROCESS_ORDER_CHANGES)
+			.routeId(PROCESS_ORDER_CHANGES)
+			.bean(OrderChangesProcessor.BEAN_NAME, "processOrderChanges");
 		
 	}
 

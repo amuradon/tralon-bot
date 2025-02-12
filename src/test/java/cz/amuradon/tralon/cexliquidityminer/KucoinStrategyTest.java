@@ -14,7 +14,9 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.camel.ProducerTemplate;
 import org.junit.Assert;
@@ -116,8 +118,10 @@ public class KucoinStrategyTest {
 		when(orderCreateResponseMock2.getOrderId()).thenReturn(NEW_ORDER_ID2);
 		when(restClientMock.orderAPI().createOrder(any())).thenReturn(orderCreateResponseMock1, orderCreateResponseMock2);
 		
+		// TODO fix tests
 		strategy = new KucoinStrategy(restClientMock, publicWsClientMock, privateWsClientMock,
-				BASE_TOKEN, QUOTE_TOKEN, 100, 100, PRICE_CHANGE_DELAY, producerTemplateMock);
+				BASE_TOKEN, QUOTE_TOKEN, new BalanceMonitor(), new BalanceHolder(), producerTemplateMock,
+				new HashMap<String, Order>(), new OrderBook());
 		
 	}
 	

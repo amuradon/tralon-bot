@@ -2,6 +2,8 @@ package cz.amuradon.tralon.cexliquidityminer;
 
 
 import java.io.IOException;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.camel.spi.CamelEvent.CamelContextStartedEvent;
 
@@ -50,6 +52,11 @@ public class BeanConfig {
 		} catch (IOException e) {
 			throw new IllegalStateException("Could not build public WS client", e);
 		}
+    }
+    
+    @Produces
+    public Map<String, Order> orders() {
+    	return new ConcurrentHashMap<>();
     }
 
     public void onCamelContextStarted(@Observes CamelContextStartedEvent event) {

@@ -1,5 +1,7 @@
 package cz.amuradon.tralon.cexliquidityminer;
 
+import java.util.Map;
+
 import org.apache.camel.ProducerTemplate;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
@@ -24,13 +26,15 @@ public class KucoinStrategyFactory {
 	
 	private final String quoteToken;
 	
-	private final int orderBookQuoteVolumeBefore;
+	private final BalanceMonitor balanceMonitor;
 	
-	private final int maxQuoteBalanceToUse;
-	
-	private final int priceChangeDelayMs;
+	private final BalanceHolder balanceHolder;
 	
 	private final ProducerTemplate producerTemplate;
+	
+	private final Map<String, Order> orders;
+	
+	private final OrderBook orderBook;
 	
 	@Inject
     public KucoinStrategyFactory(final KucoinRestClient restClient,
@@ -38,24 +42,25 @@ public class KucoinStrategyFactory {
     		final KucoinPrivateWSClient wsClientPrivate,
     		@ConfigProperty(name = "baseToken") String baseToken,
     		@ConfigProperty(name = "quoteToken") String quoteToken,
-    		@ConfigProperty(name = "orderBookQuoteVolumeBefore") int orderBookQuoteVolumeBefore,
-    		@ConfigProperty(name = "maxQuoteBalanceToUse") int maxQuoteBalanceToUse,
-    		@ConfigProperty(name = "priceChangeDelayMs") int priceChangeDelayMs,
-    		final ProducerTemplate producerTemplate
-    ) {
+    		final BalanceMonitor balanceMonitor,
+    		final BalanceHolder balanceHolder,
+    		final ProducerTemplate producerTemplate,
+    		final Map<String, Order> orders,
+    		final OrderBook orderBook) {
 		this.restClient = restClient;
 		this.wsClientPublic = wsClientPublic;
 		this.wsClientPrivate = wsClientPrivate;
 		this.baseToken = baseToken;
 		this.quoteToken = quoteToken;
-		this.orderBookQuoteVolumeBefore = orderBookQuoteVolumeBefore;
-		this.maxQuoteBalanceToUse = maxQuoteBalanceToUse;
-		this.priceChangeDelayMs = priceChangeDelayMs;
+		this.balanceMonitor = balanceMonitor;
+		this.balanceHolder = balanceHolder;
 		this.producerTemplate = producerTemplate;
+		this.orders = orders;
+		this.orderBook = orderBook;
     }
 	
 	public KucoinStrategy create() {
 		return new KucoinStrategy(restClient, wsClientPublic, wsClientPrivate, baseToken, quoteToken,
-				orderBookQuoteVolumeBefore, maxQuoteBalanceToUse, priceChangeDelayMs, producerTemplate);
+				balanceMonitor, balanceHolder, producerTemplate, orders, orderBook);
 	}
 }

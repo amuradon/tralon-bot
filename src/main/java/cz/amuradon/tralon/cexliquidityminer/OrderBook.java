@@ -1,8 +1,13 @@
 package cz.amuradon.tralon.cexliquidityminer;
 
 import java.math.BigDecimal;
+import java.util.Comparator;
 import java.util.Map;
+import java.util.concurrent.ConcurrentSkipListMap;
 
+import jakarta.enterprise.context.ApplicationScoped;
+
+@ApplicationScoped
 public class OrderBook { 
 	
 	private long sequence;
@@ -10,26 +15,23 @@ public class OrderBook {
 	private final Map<BigDecimal, BigDecimal> asks;
 	private final Map<BigDecimal, BigDecimal> bids;
 	
-	public OrderBook(long sequence,
-		Map<BigDecimal, BigDecimal> asks,
-		Map<BigDecimal, BigDecimal> bids) {
-		this.sequence = sequence;
-		this.asks = asks;
-		this.bids = bids;
+	public OrderBook() {
+		this.asks = new ConcurrentSkipListMap<>(Comparator.naturalOrder());
+		this.bids = new ConcurrentSkipListMap<>(Comparator.reverseOrder());
 	}
 	
 	public long sequence() {
 		return sequence;
 	}
 
-	public void sequence(long sequence) {
+	public void setSequence(long sequence) {
 		this.sequence = sequence;
 	}
 
 	public Map<BigDecimal, BigDecimal> getAsks() {
 		return asks;
 	}
-
+	
 	public Map<BigDecimal, BigDecimal> getBids() {
 		return bids;
 	}
