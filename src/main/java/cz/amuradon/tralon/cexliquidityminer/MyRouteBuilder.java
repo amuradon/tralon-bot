@@ -3,7 +3,6 @@ package cz.amuradon.tralon.cexliquidityminer;
 import org.apache.camel.builder.endpoint.EndpointRouteBuilder;
 
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
 
 @ApplicationScoped
 public class MyRouteBuilder extends EndpointRouteBuilder {
@@ -19,15 +18,12 @@ public class MyRouteBuilder extends EndpointRouteBuilder {
 	public void configure() throws Exception {
 		from(DIRECT_ORDER_BOOK_SNAPSHOT)
 			.bean(OrderBookManager.BEAN_NAME, "processOrderBook")
-			.to("controlbus:route?routeId=" + ROUTE_ID_LEVEL2_MARKET_UPDATE + "&action=start")
-			.log("${body}");
+			.to("controlbus:route?routeId=" + ROUTE_ID_LEVEL2_MARKET_UPDATE + "&action=start");
 		
 		from(SEDA_LEVEL2_MARKET_UPDATE)
 			.routeId(ROUTE_ID_LEVEL2_MARKET_UPDATE)
 			.autoStartup(false)
-			.bean(OrderBookManager.BEAN_NAME, "processUpdate")
-//			.log("${body}")
-			;
+			.bean(OrderBookManager.BEAN_NAME, "processUpdate");
 		
 	}
 

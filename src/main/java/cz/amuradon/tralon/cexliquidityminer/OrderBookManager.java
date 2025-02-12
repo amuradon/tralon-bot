@@ -38,8 +38,6 @@ public class OrderBookManager {
 				}
 			}
 			orderBook.sequence(sequence);
-			System.out.println("OB update: " + update);
-			System.out.println(orderBook);
 		}
 	}
 }

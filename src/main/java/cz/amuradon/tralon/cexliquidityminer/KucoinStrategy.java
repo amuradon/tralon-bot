@@ -177,7 +177,7 @@ public class KucoinStrategy {
     	event.getData().getChanges().getBids().stream().forEach(l -> producer.sendBody(
     			MyRouteBuilder.SEDA_LEVEL2_MARKET_UPDATE,
     			new OrderBookUpdate(Long.parseLong(l.get(2)), new BigDecimal(l.get(0)),
-    					new BigDecimal(l.get(1)), Side.SELL)));
+    					new BigDecimal(l.get(1)), Side.BUY)));
     }
     
     
