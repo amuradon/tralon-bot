@@ -5,12 +5,12 @@ import java.math.BigDecimal;
 public class Order {
 	
 	private final String orderId;
-	private final String side;
+	private final Side side;
 	private BigDecimal size;
 	private BigDecimal price;
 	
 	public Order(String orderId,
-			String side,
+			Side side,
 			BigDecimal size,
 			BigDecimal price) {
 		this.orderId = orderId;
@@ -31,7 +31,7 @@ public class Order {
 		return size;
 	}
 	
-	public String side() {
+	public Side side() {
 		return side;
 	}
 	

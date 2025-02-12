@@ -10,6 +10,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.camel.Body;
+import org.apache.camel.Header;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,16 +81,12 @@ public class OrderChangesProcessor {
 		this.orders = orders;
     }
 
-    public void processOrderChanges(@Body PriceLevelProposalHolder priceLevelProposalHolder) {
-    	BigDecimal askPriceLevelProposal = priceLevelProposalHolder.askPriceLevelProposal();
-    	BigDecimal bidPriceLevelProposal = priceLevelProposalHolder.bidPriceLevelProposal();
-    	
+    public void processOrderChanges(@Header("Side") Side side, @Body BigDecimal proposedPrice) {
     	// TODO Jak zjistit, ze jsem posledni v rade na dane price level
     	Map<String, Order> ordersBeKept = new ConcurrentHashMap<>();
         for (Entry<String, Order> entry: orders.entrySet()) {
         	Order order = entry.getValue();
-        	if ((BUY.equalsIgnoreCase(order.side()) && order.price().compareTo(bidPriceLevelProposal) != 0)
-        			|| (SELL.equalsIgnoreCase(order.side()) && order.price().compareTo(askPriceLevelProposal) != 0)) {
+        	if (side == order.side() && order.price().compareTo(proposedPrice) != 0) {
         		try {
         			// Wait for balance updates
         			balanceHolder.getWaitForBalanceUpdate().incrementAndGet();

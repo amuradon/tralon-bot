@@ -78,7 +78,8 @@ public class KucoinStrategy {
     public void run() {
         try {
         	restClient.orderAPI().listOrders(symbol, null, null, null, "active", null, null, 20, 1).getItems()
-        		.stream().forEach(r -> orders.put(r.getId(), new Order(r.getId(), r.getSide(), r.getSize(), r.getPrice())));
+        		.stream().forEach(r -> orders.put(r.getId(),
+        				new Order(r.getId(), Side.getValue(r.getSide()), r.getSize(), r.getPrice())));
         	LOGGER.info("Current orders {}", orders);
         	
         	for (AccountBalancesResponse balance : restClient.accountAPI().listAccounts(null, "trade")) {
@@ -144,7 +145,8 @@ public class KucoinStrategy {
 			// but this is to sync server state as well as record any manual intervention
 			
     		if ("open".equalsIgnoreCase(changeType)) {
-    			orders.put(data.getOrderId(), new Order(data.getOrderId(), data.getSide(), data.getSize(), data.getPrice()));
+    			orders.put(data.getOrderId(), 
+    					new Order(data.getOrderId(), Side.getValue(data.getSide()), data.getSize(), data.getPrice()));
     		} else if ("filled".equalsIgnoreCase(changeType)) {
     			orders.remove(data.getOrderId());
     		} else if ("cancelled".equalsIgnoreCase(changeType)) {

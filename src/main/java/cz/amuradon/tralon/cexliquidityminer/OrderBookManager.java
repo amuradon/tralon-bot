@@ -1,8 +1,10 @@
 package cz.amuradon.tralon.cexliquidityminer;
 
 import java.math.BigDecimal;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.camel.ProducerTemplate;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -28,17 +30,7 @@ public class OrderBookManager {
 	
 	private final OrderBook orderBook;
 	
-	private BigDecimal currentBidPriceLevel;
-    
-    private BigDecimal currentAskPriceLevel;
-    
-    private BigDecimal bidPriceLevelProposal;
-    
-    private BigDecimal askPriceLevelProposal;
-    
-    private long askPriceLevelProposalTimestamp;
-    
-    private long bidPriceLevelProposalTimestamp;
+    private final Map<Side, PriceLevelProposal> proposals;
 	
 	
 	@Inject
@@ -50,82 +42,77 @@ public class OrderBookManager {
 		this.priceChangeDelayMs = priceChangeDelayMs;
 		this.producer = producer;
 		this.orderBook = orderBook;
-		currentBidPriceLevel = BigDecimal.ZERO;
-		currentAskPriceLevel = BigDecimal.ZERO;
-		bidPriceLevelProposal = BigDecimal.ZERO;
-		askPriceLevelProposal = BigDecimal.ZERO;
+		proposals = new ConcurrentHashMap<>();
+		proposals.put(Side.BUY, new PriceLevelProposal());
+		proposals.put(Side.SELL, new PriceLevelProposal());
     }
 	
 	public void processUpdate(OrderBookUpdate update) {
 		final long sequence = update.sequence();
 		if (sequence > orderBook.sequence()) {
-			if (update.side() == Side.BUY) {
-				if (update.size().compareTo(BigDecimal.ZERO) == 0) {
-					orderBook.getBids().remove(update.price());
-				} else {
-					orderBook.getBids().put(update.price(), update.size());
-				}
-			} else if (update.side() == Side.SELL) {
-				if (update.size().compareTo(BigDecimal.ZERO) == 0) {
-					orderBook.getAsks().remove(update.price());
-				} else {
-					orderBook.getAsks().put(update.price(), update.size());
-				}
-			}
 			orderBook.setSequence(sequence);
+			Side side = update.side();
+			processUpdateInternal(update, proposals.get(side), side, orderBook.getOrderBookSide(side));
+		}
+	}
+	
+	private void processUpdateInternal(OrderBookUpdate update, PriceLevelProposal proposal, Side side,
+			Map<BigDecimal, BigDecimal> orderBookSide) {
 		
-	        long timestamp = update.time();
-	
-	        BigDecimal askPriceLevel = getTargetPriceLevel(orderBook.getAsks());
-	        BigDecimal bidPriceLevel = getTargetPriceLevel(orderBook.getBids());
-	        
-	        Log.debugf("Target ask price: %s", askPriceLevel);
-	        Log.debugf("Target bid price: %s", bidPriceLevel);
-	        
-	        // TODO do as little computation as possible, if there is no change, no computation
-	        if (currentAskPriceLevel.compareTo(askPriceLevel) != 0) {
-	        	if (askPriceLevelProposal.compareTo(askPriceLevel) != 0) {
-	        		askPriceLevelProposal = askPriceLevel;
-	        		askPriceLevelProposalTimestamp = timestamp;
-	        	}
-	        } else if (askPriceLevelProposal.compareTo(currentAskPriceLevel) != 0) {
-	        	askPriceLevelProposal = currentAskPriceLevel;
-	        	askPriceLevelProposalTimestamp = Long.MAX_VALUE - priceChangeDelayMs;
-	        }
-	        
-	        if (currentBidPriceLevel.compareTo(bidPriceLevel) != 0) {
-	        	bidPriceLevelProposal = bidPriceLevel;
-	        	bidPriceLevelProposalTimestamp = timestamp;
-	        } else if (bidPriceLevelProposal.compareTo(currentBidPriceLevel) != 0) {
-	        	bidPriceLevelProposal = currentBidPriceLevel;
-	        	bidPriceLevelProposalTimestamp = Long.MAX_VALUE - priceChangeDelayMs;
-	        }
-	        
-	        if (timestamp >= askPriceLevelProposalTimestamp + priceChangeDelayMs ||
-	        		timestamp >= bidPriceLevelProposalTimestamp + priceChangeDelayMs) {
-	
-	        	currentAskPriceLevel = askPriceLevelProposal;
-	        	currentBidPriceLevel = bidPriceLevelProposal;
-	        	askPriceLevelProposalTimestamp = Long.MAX_VALUE - priceChangeDelayMs;
-	        	bidPriceLevelProposalTimestamp = Long.MAX_VALUE - priceChangeDelayMs;
-	        	
-	        	producer.sendBody(MyRouteBuilder.SEDA_PROCESS_ORDER_CHANGES,
-	        			new PriceLevelProposalHolder(askPriceLevelProposal, bidPriceLevelProposal));
-	        }
+		if (update.size().compareTo(BigDecimal.ZERO) == 0) {
+			orderBookSide.remove(update.price());
+		} else {
+			orderBookSide.put(update.price(), update.size());
+		}
+		
+		
+		// TODO if the update's price is farther then target price level, skip the processing below
+		long timestamp = update.time();
+		
+		BigDecimal targetPrice = getTargetPriceLevel(orderBook.getAsks());
+		
+		Log.debugf("Target ask price: %s", targetPrice);
+		
+		// TODO do as little computation as possible, if there is no change, no computation
+		if (proposal.currentPrice.compareTo(targetPrice) != 0) {
+			if (proposal.proposedPrice.compareTo(targetPrice) != 0) {
+				proposal.proposedPrice = targetPrice;
+				proposal.timestamp = timestamp;
+			}
+		} else if (proposal.proposedPrice.compareTo(proposal.currentPrice) != 0) {
+			proposal.proposedPrice = proposal.currentPrice;
+			proposal.timestamp = Long.MAX_VALUE - priceChangeDelayMs;
+		}
+		
+		if (timestamp >= proposal.timestamp + priceChangeDelayMs) {
+			
+			proposal.currentPrice = proposal.proposedPrice;
+			proposal.timestamp = Long.MAX_VALUE - priceChangeDelayMs;
+			
+			producer.sendBodyAndHeader(MyRouteBuilder.SEDA_PROCESS_ORDER_CHANGES,
+					proposal.proposedPrice, "Side", side);
 		}
 	}
 	
 	 private BigDecimal getTargetPriceLevel(Map<BigDecimal, BigDecimal> aggregatedOrders) {
-	    	BigDecimal volume = BigDecimal.ZERO;
-	    	BigDecimal price = BigDecimal.ZERO;
-	    	for (Entry<BigDecimal, BigDecimal> entry : aggregatedOrders.entrySet()) {
-	    		price = entry.getKey();
-				volume = volume.add(price.multiply(entry.getValue()));
-				if (volume.compareTo(sideVolumeThreshold) >= 0) {
-					break;
-				}
+    	BigDecimal volume = BigDecimal.ZERO;
+    	BigDecimal price = BigDecimal.ZERO;
+    	for (Entry<BigDecimal, BigDecimal> entry : aggregatedOrders.entrySet()) {
+    		price = entry.getKey();
+			volume = volume.add(price.multiply(entry.getValue()));
+			if (volume.compareTo(sideVolumeThreshold) >= 0) {
+				break;
 			}
-	    	
-	    	return price;
-	    }
+		}
+    	
+    	return price;
+    }
+	 
+	private static final class PriceLevelProposal {
+		private BigDecimal currentPrice = BigDecimal.ZERO;
+	    
+	    private BigDecimal proposedPrice = BigDecimal.ZERO;
+	    
+	    private long timestamp;
+	}
 }
