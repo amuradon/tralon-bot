@@ -1,5 +1,7 @@
 package cz.amuradon.tralon.cexliquidityminer;
 
+import static cz.amuradon.tralon.cexliquidityminer.MyRouteBuilder.SEDA_PLACE_NEW_ORDERS;
+
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.Date;
@@ -47,79 +49,67 @@ public class KucoinStrategy {
 	
 	private final String symbol;
 	
-	private final BalanceMonitor balanceMonitor;
-	
-	private final BalanceHolder balanceHolder;
-	
 	private final ProducerTemplate producer;
 	
     private final Map<String, Order> orders;
     
-    private final OrderBook orderBook;
+    private final OrderBookManager orderBookManager;
+    
+    private final BalanceHolder balanceHolder;
     
     public KucoinStrategy(final KucoinRestClient restClient, final KucoinPublicWSClient wsClientPublic,
     		final KucoinPrivateWSClient wsClientPrivate, final String baseToken, final String quoteToken,
-    		final BalanceMonitor balanceMonitor, final BalanceHolder balanceHolder,
     		final ProducerTemplate producer, final Map<String, Order> orders,
-    		final OrderBook orderBook) {
+    		final OrderBookManager orderBookManager) {
 		this.restClient = restClient;
 		this.wsClientPublic = wsClientPublic;
 		this.wsClientPrivate = wsClientPrivate;
 		this.baseToken = baseToken;
 		this.quoteToken = quoteToken;
 		symbol = baseToken + "-" + quoteToken;
-		this.balanceMonitor = balanceMonitor;
-		this.balanceHolder = balanceHolder;
 		this.producer = producer;
 		this.orders = orders;
-		this.orderBook = orderBook;
+		this.orderBookManager = orderBookManager;
+		this.balanceHolder = new BalanceHolder();
     }
 
     public void run() {
         try {
-        	restClient.orderAPI().listOrders(symbol, null, null, null, "active", null, null, 20, 1).getItems()
-        		.stream().forEach(r -> orders.put(r.getId(),
-        				new Order(r.getId(), Side.getValue(r.getSide()), r.getSize(), r.getPrice())));
-        	LOGGER.info("Current orders {}", orders);
-        	
-        	for (AccountBalancesResponse balance : restClient.accountAPI().listAccounts(null, "trade")) {
-				if (baseToken.equalsIgnoreCase(balance.getCurrency())) {
-        			synchronized (balanceHolder) {
-        				BigDecimal baseBalance = balance.getAvailable();
-        				balanceHolder.setBaseBalance(baseBalance);
-        				LOGGER.info("Available base balance {}: {}", baseToken, baseBalance);
-					}
-        		} else if (quoteToken.equalsIgnoreCase(balance.getCurrency())) {
-        			synchronized (balanceHolder) {
-        				BigDecimal quoteBalance = balance.getAvailable();
-        				balanceHolder.setQuoteBalance(quoteBalance);
-        				LOGGER.info("Available quote balance {}: {}", quoteToken, quoteBalance);
-					}
-        		}
-        	}
-        	
+        	// Start consuming data from websockets
             wsClientPrivate.onOrderChange(this::onOrderChange);
-            wsClientPrivate.onAccountBalance(this::onAccountBalance);
         	wsClientPublic.onLevel2Data(this::onL2RT, symbol);
 
-        	OrderBookResponse orderBookResponse = restClient.orderBookAPI().getAllLevel2OrderBook(symbol);
-        	LOGGER.info("Order Book response: seq {}\nAsks:\n{}\nBids:\n{}", orderBookResponse.getSequence(),
-        			orderBookResponse.getAsks(), orderBookResponse.getBids());
-        	orderBook.setSequence(Long.parseLong(orderBookResponse.getSequence()));
-   			setOrderBookSide(orderBookResponse.getAsks(), orderBook.getAsks());
-        	setOrderBookSide(orderBookResponse.getBids(), orderBook.getBids());
-        	producer.sendBody(MyRouteBuilder.DIRECT_START_L2_MARKET_UPDATE_ROUTE, orderBook);
+        	orderBookManager.createLocalOrderBook();
+        	producer.sendBody(MyRouteBuilder.DIRECT_START_L2_MARKET_UPDATE_ROUTE, null);
+        	
+        	// Get existing orders
+        	restClient.orderAPI().listOrders(symbol, null, null, null, "active", null, null, 20, 1).getItems()
+    		.stream().forEach(r -> orders.put(r.getId(),
+    				new Order(r.getId(), Side.getValue(r.getSide()), r.getSize(), r.getPrice())));
+	    	LOGGER.info("Current orders {}", orders);
+	    	
+	    	
+	    	for (AccountBalancesResponse balance : restClient.accountAPI().listAccounts(null, "trade")) {
+				if (baseToken.equalsIgnoreCase(balance.getCurrency())) {
+    				BigDecimal baseBalance = balance.getAvailable();
+    				balanceHolder.setBaseBalance(baseBalance);
+    				LOGGER.info("Available base balance {}: {}", baseToken, baseBalance);
+	    		} else if (quoteToken.equalsIgnoreCase(balance.getCurrency())) {
+    				BigDecimal quoteBalance = balance.getAvailable();
+    				balanceHolder.setQuoteBalance(quoteBalance);
+    				LOGGER.info("Available quote balance {}: {}", quoteToken, quoteBalance);
+	    		}
+	    	}
+	    	producer.sendBodyAndHeader(SEDA_PLACE_NEW_ORDERS, balanceHolder.clone(), "Side", Side.SELL);
+
+	    	// Start balance websocket after initial call
+	    	wsClientPrivate.onAccountBalance(this::onAccountBalance);
+
         } catch (IOException e) {
             throw new IllegalStateException("Could not be initiated.", e);
         }
     }
     
-    private void setOrderBookSide(List<List<String>> list, final Map<BigDecimal, BigDecimal> map) {
-    	for (List<String> element : list) {
-			map.put(new BigDecimal(element.get(0)), new BigDecimal(element.get(1)));
-		}
-    }
-
     private void onL2RT(KucoinEvent<Level2ChangeEvent> event) {
     	Log.trace(event);
     	
@@ -163,22 +153,16 @@ public class KucoinStrategy {
     private void onAccountBalance(KucoinEvent<AccountChangeEvent> event) {
     	LOGGER.debug("{}", event);
     	AccountChangeEvent data = event.getData();
-    	balanceHolder.getWaitForBalanceUpdate().updateAndGet(i -> Math.max(0, i - 1));
     	if (baseToken.equalsIgnoreCase(data.getCurrency())) {
-    		synchronized (balanceHolder) {
-				BigDecimal baseBalance = data.getAvailable();
-				balanceHolder.setBaseBalance(baseBalance);
-				LOGGER.info("Base balance changed {}: {}", baseToken, baseBalance);
-			}
+			BigDecimal baseBalance = data.getAvailable();
+			balanceHolder.setBaseBalance(baseBalance);
+			LOGGER.info("Base balance changed {}: {}", baseToken, baseBalance);
+			producer.sendBodyAndHeader(SEDA_PLACE_NEW_ORDERS, balanceHolder.clone(), "Side", Side.SELL);
 		} else if (quoteToken.equalsIgnoreCase(data.getCurrency())) {
-			synchronized (balanceHolder) {
-				BigDecimal quoteBalance = data.getAvailable();
-				balanceHolder.setQuoteBalance(quoteBalance);
-				LOGGER.info("Quote balance changed {}: {}", quoteToken, quoteBalance);
-			}
-		}
-    	synchronized (balanceMonitor) {
-    		balanceMonitor.notifyAll();
+			BigDecimal quoteBalance = data.getAvailable();
+			balanceHolder.setQuoteBalance(quoteBalance);
+			LOGGER.info("Quote balance changed {}: {}", quoteToken, quoteBalance);
+			producer.sendBodyAndHeader(SEDA_PLACE_NEW_ORDERS, balanceHolder.clone(), "Side", Side.BUY);
 		}
     }
 }

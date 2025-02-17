@@ -13,11 +13,13 @@ public class MyRouteBuilder extends EndpointRouteBuilder {
 	
 	public static final String SEDA_LEVEL2_MARKET_UPDATE = "seda:" + LEVEL2_MARKET_UPDATE;
 	
-	private static final String PROCESS_ORDER_CHANGES = "processOrderChanges";
+	private static final String CANCEL_ORDERS = "cancelOrders";
 	
-	public static final String SEDA_PROCESS_ORDER_CHANGES = "seda:" + PROCESS_ORDER_CHANGES;
+	public static final String SEDA_CANCEL_ORDERS = "seda:" + CANCEL_ORDERS;
 	
-	
+	private static final String PLACE_NEW_ORDERS = "placeNewOrders";
+
+	public static final String SEDA_PLACE_NEW_ORDERS = "seda:" + PLACE_NEW_ORDERS;
 	
 	@Override
 	public void configure() throws Exception {
@@ -30,9 +32,13 @@ public class MyRouteBuilder extends EndpointRouteBuilder {
 			.autoStartup(false)
 			.bean(OrderBookManager.BEAN_NAME, "processUpdate");
 		
-		from(SEDA_PROCESS_ORDER_CHANGES)
-			.routeId(PROCESS_ORDER_CHANGES)
-			.bean(OrderChangesProcessor.BEAN_NAME, "processOrderChanges");
+		from(SEDA_CANCEL_ORDERS)
+			.routeId(CANCEL_ORDERS)
+			.bean(CancelOrders.BEAN_NAME);
+		
+		from(SEDA_PLACE_NEW_ORDERS)
+			.routeId(PLACE_NEW_ORDERS)
+			.bean(PlaceNewOrders.BEAN_NAME);
 		
 	}
 

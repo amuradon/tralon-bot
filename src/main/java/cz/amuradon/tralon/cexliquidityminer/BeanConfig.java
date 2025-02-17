@@ -31,11 +31,13 @@ public class BeanConfig {
                 .withApiKey("679ca3116425d800012adbc2", "94149a7a-69c8-4647-95b0-a83fc36933e5", "K1986dub27");
 	}
 	
+	@ApplicationScoped
     @Produces
     public KucoinRestClient kucoinRestClient() {
     	return kucoinClientBuilder.buildRestClient();
     }
     
+    @ApplicationScoped
     @Produces
     public KucoinPrivateWSClient kucoinPrivateWSClient() {
     	try {
@@ -45,6 +47,7 @@ public class BeanConfig {
 		}
     }
     
+    @ApplicationScoped
     @Produces
     public KucoinPublicWSClient kucoinPublicWSClient() {
     	try {
@@ -54,9 +57,19 @@ public class BeanConfig {
 		}
     }
     
+    @ApplicationScoped
     @Produces
     public Map<String, Order> orders() {
     	return new ConcurrentHashMap<>();
+    }
+    
+    @ApplicationScoped
+    @Produces
+    public Map<Side, PriceProposal> proposals() {
+    	ConcurrentHashMap<Side, PriceProposal> proposals = new ConcurrentHashMap<>();
+		proposals.put(Side.BUY, new PriceProposal());
+		proposals.put(Side.SELL, new PriceProposal());
+		return proposals;
     }
 
     public void onCamelContextStarted(@Observes CamelContextStartedEvent event) {

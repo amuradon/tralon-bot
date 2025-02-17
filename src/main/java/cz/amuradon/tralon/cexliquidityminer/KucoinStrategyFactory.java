@@ -26,15 +26,11 @@ public class KucoinStrategyFactory {
 	
 	private final String quoteToken;
 	
-	private final BalanceMonitor balanceMonitor;
-	
-	private final BalanceHolder balanceHolder;
-	
 	private final ProducerTemplate producerTemplate;
 	
 	private final Map<String, Order> orders;
 	
-	private final OrderBook orderBook;
+	private final OrderBookManager orderBookManager;
 	
 	@Inject
     public KucoinStrategyFactory(final KucoinRestClient restClient,
@@ -42,25 +38,21 @@ public class KucoinStrategyFactory {
     		final KucoinPrivateWSClient wsClientPrivate,
     		@ConfigProperty(name = "baseToken") String baseToken,
     		@ConfigProperty(name = "quoteToken") String quoteToken,
-    		final BalanceMonitor balanceMonitor,
-    		final BalanceHolder balanceHolder,
     		final ProducerTemplate producerTemplate,
     		final Map<String, Order> orders,
-    		final OrderBook orderBook) {
+    		final OrderBookManager orderBookManager) {
 		this.restClient = restClient;
 		this.wsClientPublic = wsClientPublic;
 		this.wsClientPrivate = wsClientPrivate;
 		this.baseToken = baseToken;
 		this.quoteToken = quoteToken;
-		this.balanceMonitor = balanceMonitor;
-		this.balanceHolder = balanceHolder;
 		this.producerTemplate = producerTemplate;
 		this.orders = orders;
-		this.orderBook = orderBook;
+		this.orderBookManager = orderBookManager;
     }
 	
 	public KucoinStrategy create() {
 		return new KucoinStrategy(restClient, wsClientPublic, wsClientPrivate, baseToken, quoteToken,
-				balanceMonitor, balanceHolder, producerTemplate, orders, orderBook);
+				producerTemplate, orders, orderBookManager);
 	}
 }

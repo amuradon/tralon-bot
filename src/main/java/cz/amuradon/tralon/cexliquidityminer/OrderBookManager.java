@@ -1,13 +1,17 @@
 package cz.amuradon.tralon.cexliquidityminer;
 
+import java.io.IOException;
 import java.math.BigDecimal;
-import java.util.HashMap;
+import java.util.Date;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.camel.ProducerTemplate;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
+
+import com.kucoin.sdk.KucoinRestClient;
+import com.kucoin.sdk.rest.response.OrderBookResponse;
 
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.annotations.RegisterForReflection;
@@ -22,6 +26,8 @@ public class OrderBookManager {
 
 	public static final String BEAN_NAME = "orderBookManager";
 	
+	private final KucoinRestClient restClient;
+	
 	private final BigDecimal sideVolumeThreshold;
 	
 	private final int priceChangeDelayMs;
@@ -30,24 +36,30 @@ public class OrderBookManager {
 	
 	private final OrderBook orderBook;
 	
-    private final Map<Side, PriceLevelProposal> proposals;
+    private final Map<Side, PriceProposal> proposals;
+    
+    private final String symbol;
 	
 	
 	@Inject
-	public OrderBookManager(
+	public OrderBookManager(final KucoinRestClient restClient,
 			@ConfigProperty(name = "orderBookQuoteVolumeBefore") final int sideVolumeThreshold, 
 			@ConfigProperty(name = "priceChangeDelayMs") final int priceChangeDelayMs,
-    		final ProducerTemplate producer, final OrderBook orderBook) {
+    		final ProducerTemplate producer, final OrderBook orderBook,
+    		final Map<Side, PriceProposal> proposals,
+    		@ConfigProperty(name = "baseToken") String baseToken,
+    		@ConfigProperty(name = "quoteToken") String quoteToken) {
+		this.restClient = restClient;
 		this.sideVolumeThreshold = new BigDecimal(sideVolumeThreshold);
 		this.priceChangeDelayMs = priceChangeDelayMs;
 		this.producer = producer;
 		this.orderBook = orderBook;
-		proposals = new ConcurrentHashMap<>();
-		proposals.put(Side.BUY, new PriceLevelProposal());
-		proposals.put(Side.SELL, new PriceLevelProposal());
+		this.proposals = proposals;
+		symbol = baseToken + "-" + quoteToken;
     }
 	
 	public void processUpdate(OrderBookUpdate update) {
+		Log.tracef("Order book update: %s", update);
 		final long sequence = update.sequence();
 		if (sequence > orderBook.sequence()) {
 			orderBook.setSequence(sequence);
@@ -56,7 +68,7 @@ public class OrderBookManager {
 		}
 	}
 	
-	private void processUpdateInternal(OrderBookUpdate update, PriceLevelProposal proposal, Side side,
+	private void processUpdateInternal(OrderBookUpdate update, PriceProposal proposal, Side side,
 			Map<BigDecimal, BigDecimal> orderBookSide) {
 		
 		if (update.size().compareTo(BigDecimal.ZERO) == 0) {
@@ -65,37 +77,40 @@ public class OrderBookManager {
 			orderBookSide.put(update.price(), update.size());
 		}
 		
-		
-		// TODO if the update's price is farther then target price level, skip the processing below
-		long timestamp = update.time();
-		
-		BigDecimal targetPrice = getTargetPriceLevel(orderBook.getAsks());
-		
-		Log.debugf("Target ask price: %s", targetPrice);
-		
 		// TODO do as little computation as possible, if there is no change, no computation
-		if (proposal.currentPrice.compareTo(targetPrice) != 0) {
-			if (proposal.proposedPrice.compareTo(targetPrice) != 0) {
-				proposal.proposedPrice = targetPrice;
-				proposal.timestamp = timestamp;
+		synchronized (proposal) {
+			if (!side.isPriceOutOfRange(update.price(), proposal.currentPrice)) {
+				long timestamp = update.time();
+				
+				
+				BigDecimal targetPrice = getTargetPriceLevel(orderBookSide);
+				
+				Log.debugf("Target %s price: %s", side, targetPrice);
+				
+				if (proposal.currentPrice.compareTo(targetPrice) != 0) {
+					if (proposal.proposedPrice.compareTo(targetPrice) != 0) {
+						proposal.proposedPrice = targetPrice;
+						proposal.timestamp = timestamp;
+					}
+				} else if (proposal.proposedPrice.compareTo(proposal.currentPrice) != 0) {
+					proposal.proposedPrice = proposal.currentPrice;
+					proposal.timestamp = Long.MAX_VALUE - priceChangeDelayMs;
+				}
+				
+				if (timestamp >= proposal.timestamp + priceChangeDelayMs) {
+					
+					proposal.currentPrice = proposal.proposedPrice;
+					proposal.timestamp = Long.MAX_VALUE - priceChangeDelayMs;
+					
+					producer.sendBodyAndHeader(MyRouteBuilder.SEDA_CANCEL_ORDERS,
+							proposal.proposedPrice, "Side", side);
+				}
 			}
-		} else if (proposal.proposedPrice.compareTo(proposal.currentPrice) != 0) {
-			proposal.proposedPrice = proposal.currentPrice;
-			proposal.timestamp = Long.MAX_VALUE - priceChangeDelayMs;
-		}
-		
-		if (timestamp >= proposal.timestamp + priceChangeDelayMs) {
-			
-			proposal.currentPrice = proposal.proposedPrice;
-			proposal.timestamp = Long.MAX_VALUE - priceChangeDelayMs;
-			
-			producer.sendBodyAndHeader(MyRouteBuilder.SEDA_PROCESS_ORDER_CHANGES,
-					proposal.proposedPrice, "Side", side);
 		}
 	}
 	
-	 private BigDecimal getTargetPriceLevel(Map<BigDecimal, BigDecimal> aggregatedOrders) {
-    	BigDecimal volume = BigDecimal.ZERO;
+	private BigDecimal getTargetPriceLevel(Map<BigDecimal, BigDecimal> aggregatedOrders) {
+		BigDecimal volume = BigDecimal.ZERO;
     	BigDecimal price = BigDecimal.ZERO;
     	for (Entry<BigDecimal, BigDecimal> entry : aggregatedOrders.entrySet()) {
     		price = entry.getKey();
@@ -107,12 +122,43 @@ public class OrderBookManager {
     	
     	return price;
     }
-	 
-	private static final class PriceLevelProposal {
-		private BigDecimal currentPrice = BigDecimal.ZERO;
-	    
-	    private BigDecimal proposedPrice = BigDecimal.ZERO;
-	    
-	    private long timestamp;
+	
+	public void createLocalOrderBook() {
+		try {
+	    	OrderBookResponse orderBookResponse = restClient.orderBookAPI().getAllLevel2OrderBook(symbol);
+	    	Log.infof("Order Book response: seq %s\nAsks:\n%s\nBids:\n%s", orderBookResponse.getSequence(),
+	    			orderBookResponse.getAsks(), orderBookResponse.getBids());
+	    	orderBook.setSequence(Long.parseLong(orderBookResponse.getSequence()));
+				setOrderBookSide(orderBookResponse.getAsks(), orderBook.getAsks());
+	    	setOrderBookSide(orderBookResponse.getBids(), orderBook.getBids());
+	    	
+	    	Log.debugf("Order book created: %s", orderBook);
+	    	
+	    	long timestamp = new Date().getTime();
+	    	BigDecimal askPrice = getTargetPriceLevel(orderBook.getAsks());
+	    	PriceProposal askProposal = proposals.get(Side.SELL);
+	    	askProposal.currentPrice = askPrice;
+	    	askProposal.proposedPrice = askPrice;
+	    	askProposal.timestamp = timestamp;
+	    			
+	    	BigDecimal bidPrice = getTargetPriceLevel(orderBook.getBids());
+	    	PriceProposal bidProposal = proposals.get(Side.BUY);
+	    	bidProposal.currentPrice = bidPrice;
+	    	bidProposal.proposedPrice = bidPrice;
+	    	bidProposal.timestamp = timestamp;
+	    	
+	    	Log.debugf("First price proposals calculated - ask: %s, bid: %s", askPrice, bidPrice);
+	    	
+		} catch (IOException e) {
+			// TODO: handle exception
+			e.printStackTrace();
+		}
 	}
+	
+	private void setOrderBookSide(List<List<String>> list, final Map<BigDecimal, BigDecimal> map) {
+    	for (List<String> element : list) {
+			map.put(new BigDecimal(element.get(0)), new BigDecimal(element.get(1)));
+		}
+    }
+
 }

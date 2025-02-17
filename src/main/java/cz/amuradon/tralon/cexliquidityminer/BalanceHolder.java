@@ -1,23 +1,16 @@
 package cz.amuradon.tralon.cexliquidityminer;
 
 import java.math.BigDecimal;
-import java.util.concurrent.atomic.AtomicInteger;
 
-import jakarta.enterprise.context.ApplicationScoped;
-
-@ApplicationScoped
 public class BalanceHolder {
 
 	private BigDecimal baseBalance;
 	    
 	private BigDecimal quoteBalance;
 	  
-	private AtomicInteger waitForBalanceUpdate;
-	
 	public BalanceHolder() {
 		baseBalance = BigDecimal.ZERO;
 	    quoteBalance = BigDecimal.ZERO;
-		waitForBalanceUpdate = new AtomicInteger(0);
 	}
 	
 	public BigDecimal getBaseBalance() {
@@ -36,7 +29,10 @@ public class BalanceHolder {
 		this.quoteBalance = quoteBalance;
 	}
 
-	public AtomicInteger getWaitForBalanceUpdate() {
-		return waitForBalanceUpdate;
+	public BalanceHolder clone() {
+		BalanceHolder holder = new BalanceHolder();
+		holder.baseBalance = baseBalance;
+		holder.quoteBalance = quoteBalance;
+		return holder;
 	}
 }
