@@ -1,4 +1,4 @@
-package cz.amuradon.tralon.cexliquidityminer;
+package cz.amuradon.tralon.cexliquiditymining;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -19,7 +19,7 @@ import com.kucoin.sdk.websocket.event.OrderChangeEvent;
 
 import io.quarkus.logging.Log;
 
-public class KucoinStrategy {
+public class KucoinEngine implements Runnable {
 	
 	/* TODO
 	 * - support multiple orders
@@ -30,7 +30,7 @@ public class KucoinStrategy {
 	 *   - pocitat, kolik volume je pred v order book?
 	 * */
 
-	private static final Logger LOGGER = LoggerFactory.getLogger(KucoinStrategy.class);
+	private static final Logger LOGGER = LoggerFactory.getLogger(KucoinEngine.class);
 	
 	private final KucoinRestClient restClient;
     
@@ -52,7 +52,7 @@ public class KucoinStrategy {
     
     private final PlaceNewOrders placeNewOrders;
     
-    public KucoinStrategy(final KucoinRestClient restClient, final KucoinPublicWSClient wsClientPublic,
+    public KucoinEngine(final KucoinRestClient restClient, final KucoinPublicWSClient wsClientPublic,
     		final KucoinPrivateWSClient wsClientPrivate, final String baseToken, final String quoteToken,
     		final Map<String, Order> orders,
     		final OrderBookManager orderBookManager,
@@ -75,31 +75,22 @@ public class KucoinStrategy {
             wsClientPrivate.onOrderChange(this::onOrderChange);
         	wsClientPublic.onLevel2Data(this::onL2RT, symbol);
 
+        	// Create local order book
         	orderBookManager.createLocalOrderBook();
         	
         	// Get existing orders
-        	restClient.orderAPI().listOrders(symbol, null, null, null, "active", null, null, 20, 1).getItems()
-    		.stream().forEach(r -> orders.put(r.getId(),
-    				new Order(r.getId(), Side.getValue(r.getSide()), r.getSize(), r.getPrice())));
+			restClient.orderAPI().listOrders(symbol, null, null, null, "active", null, null, 20, 1).getItems().stream()
+					.forEach(r -> orders.put(r.getId(),
+							new Order(r.getId(), Side.getValue(r.getSide()), r.getSize(), r.getPrice())));
 	    	LOGGER.info("Current orders {}", orders);
 	    	
-	    	
+	    	// Get existing balances
 	    	for (AccountBalancesResponse balance : restClient.accountAPI().listAccounts(null, "trade")) {
-				if (baseToken.equalsIgnoreCase(balance.getCurrency())) {
-    				BigDecimal baseBalance = balance.getAvailable();
-    				balanceHolder.setBaseBalance(baseBalance);
-    				LOGGER.info("Available base balance {}: {}", baseToken, baseBalance);
-	    		} else if (quoteToken.equalsIgnoreCase(balance.getCurrency())) {
-    				BigDecimal quoteBalance = balance.getAvailable();
-    				balanceHolder.setQuoteBalance(quoteBalance);
-    				LOGGER.info("Available quote balance {}: {}", quoteToken, quoteBalance);
-	    		}
+				onAccountBalance(new AccountBalance(balance.getCurrency(), balance.getAvailable()));
 	    	}
-	    	placeNewOrders.processOrderChanges(balanceHolder.clone());
 
 	    	// Start balance websocket after initial call
 	    	wsClientPrivate.onAccountBalance(this::onAccountBalance);
-
         } catch (IOException e) {
             throw new IllegalStateException("Could not be initiated.", e);
         }
@@ -147,17 +138,21 @@ public class KucoinStrategy {
     private void onAccountBalance(KucoinEvent<AccountChangeEvent> event) {
     	LOGGER.debug("{}", event);
     	AccountChangeEvent data = event.getData();
-    	if (baseToken.equalsIgnoreCase(data.getCurrency())) {
-			BigDecimal baseBalance = data.getAvailable();
-			balanceHolder.setBaseBalance(baseBalance);
-			LOGGER.info("Base balance changed {}: {}", baseToken, baseBalance);
-			// XXX is the split needed since Side is not passed as arg anymore
-			placeNewOrders.processOrderChanges(balanceHolder);
-		} else if (quoteToken.equalsIgnoreCase(data.getCurrency())) {
-			BigDecimal quoteBalance = data.getAvailable();
-			balanceHolder.setQuoteBalance(quoteBalance);
-			LOGGER.info("Quote balance changed {}: {}", quoteToken, quoteBalance);
-			placeNewOrders.processOrderChanges(balanceHolder);
-		}
+    	onAccountBalance(new AccountBalance(data.getCurrency(), data.getAvailable()));
+    }
+
+    private void onAccountBalance(AccountBalance accountBalance) {
+    	String token = accountBalance.token();
+    	BigDecimal available = accountBalance.available();
+		if (baseToken.equalsIgnoreCase(token)) {
+    		balanceHolder.setBaseBalance(available);
+    		LOGGER.info("Base balance changed {}: {}", baseToken, available);
+    		// XXX is the split needed since Side is not passed as arg anymore
+    		placeNewOrders.processOrderChanges(balanceHolder);
+    	} else if (quoteToken.equalsIgnoreCase(accountBalance.token())) {
+    		balanceHolder.setQuoteBalance(available);
+    		LOGGER.info("Quote balance changed {}: {}", quoteToken, available);
+    		placeNewOrders.processOrderChanges(balanceHolder);
+    	}
     }
 }

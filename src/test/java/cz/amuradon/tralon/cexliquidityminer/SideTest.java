@@ -7,6 +7,8 @@ import java.math.BigDecimal;
 
 import org.junit.jupiter.api.Test;
 
+import cz.amuradon.tralon.cexliquiditymining.Side;
+
 public class SideTest {
 
 	@Test

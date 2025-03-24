@@ -1,4 +1,4 @@
-package cz.amuradon.tralon.cexliquidityminer;
+package cz.amuradon.tralon.cexliquiditymining;
 
 
 import java.io.IOException;
@@ -10,6 +10,8 @@ import com.kucoin.sdk.KucoinPrivateWSClient;
 import com.kucoin.sdk.KucoinPublicWSClient;
 import com.kucoin.sdk.KucoinRestClient;
 
+import cz.amuradon.tralon.cexliquiditymining.strategies.Strategy;
+import cz.amuradon.tralon.cexliquiditymining.strategies.WallBeforeStrategy;
 import io.quarkus.runtime.Startup;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Produces;
@@ -20,13 +22,13 @@ public class BeanConfig {
 
 	private final KucoinClientBuilder kucoinClientBuilder;
 	
-	private final KucoinStrategyFactory strategyFactory;
+	private final KucoinEngineFactory strategyFactory;
 	
 	@Inject
-	public BeanConfig(final KucoinStrategyFactory strategyFactory) {
+	public BeanConfig(final KucoinEngineFactory strategyFactory) {
 		this.strategyFactory = strategyFactory;
 		kucoinClientBuilder = new KucoinClientBuilder().withBaseUrl("https://openapi-v2.kucoin.com")
-                .withApiKey("679ca3116425d800012adbc2", "94149a7a-69c8-4647-95b0-a83fc36933e5", "K1986dub27");
+                .withApiKey("67e12bcf6fb8e00001f0cda5", "84b9d7b5-4bcc-46dc-a549-bc2677e674ea", "K1986dub27");
 	}
 	
 	@ApplicationScoped
@@ -69,9 +71,10 @@ public class BeanConfig {
 		proposals.put(Side.SELL, new PriceProposal());
 		return proposals;
     }
-
+    
+    // XXX Pravdepodobne ne tak ciste reseni, asi bych mel delegovat do vlastniho vlakna?
     @Startup
     public void start() {
-    	strategyFactory.create().run();
+    	new Thread(strategyFactory.create(), "Startup").start();
     }
 }

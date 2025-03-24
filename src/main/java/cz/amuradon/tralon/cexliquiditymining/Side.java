@@ -1,4 +1,4 @@
-package cz.amuradon.tralon.cexliquidityminer;
+package cz.amuradon.tralon.cexliquiditymining;
 
 import java.math.BigDecimal;
 

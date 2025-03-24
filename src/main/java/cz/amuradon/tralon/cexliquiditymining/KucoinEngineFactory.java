@@ -1,4 +1,4 @@
-package cz.amuradon.tralon.cexliquidityminer;
+package cz.amuradon.tralon.cexliquiditymining;
 
 import java.util.Map;
 
@@ -13,7 +13,7 @@ import jakarta.inject.Inject;
 
 
 @ApplicationScoped
-public class KucoinStrategyFactory {
+public class KucoinEngineFactory {
 
 	private final KucoinRestClient restClient;
     
@@ -32,7 +32,7 @@ public class KucoinStrategyFactory {
 	private final PlaceNewOrders placeNewOrders;
 	
 	@Inject
-    public KucoinStrategyFactory(final KucoinRestClient restClient,
+    public KucoinEngineFactory(final KucoinRestClient restClient,
     		final KucoinPublicWSClient wsClientPublic,
     		final KucoinPrivateWSClient wsClientPrivate,
     		@ConfigProperty(name = "baseToken") String baseToken,
@@ -50,8 +50,8 @@ public class KucoinStrategyFactory {
 		this.placeNewOrders = placeNewOrders;
     }
 	
-	public KucoinStrategy create() {
-		return new KucoinStrategy(restClient, wsClientPublic, wsClientPrivate, baseToken, quoteToken,
+	public Runnable create() {
+		return new KucoinEngine(restClient, wsClientPublic, wsClientPrivate, baseToken, quoteToken,
 				orders, orderBookManager, placeNewOrders);
 	}
 }
