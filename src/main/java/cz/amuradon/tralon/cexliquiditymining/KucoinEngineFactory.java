@@ -8,6 +8,7 @@ import com.kucoin.sdk.KucoinPrivateWSClient;
 import com.kucoin.sdk.KucoinPublicWSClient;
 import com.kucoin.sdk.KucoinRestClient;
 
+import cz.amuradon.tralon.cexliquiditymining.strategies.Strategy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -29,7 +30,7 @@ public class KucoinEngineFactory {
 	
 	private final OrderBookManager orderBookManager;
 	
-	private final PlaceNewOrders placeNewOrders;
+	private final Strategy strategy;
 	
 	@Inject
     public KucoinEngineFactory(final KucoinRestClient restClient,
@@ -39,7 +40,7 @@ public class KucoinEngineFactory {
     		@ConfigProperty(name = "quoteToken") String quoteToken,
     		final Map<String, Order> orders,
     		final OrderBookManager orderBookManager,
-    		final PlaceNewOrders placeNewOrders) {
+    		final Strategy strategy) {
 		this.restClient = restClient;
 		this.wsClientPublic = wsClientPublic;
 		this.wsClientPrivate = wsClientPrivate;
@@ -47,11 +48,11 @@ public class KucoinEngineFactory {
 		this.quoteToken = quoteToken;
 		this.orders = orders;
 		this.orderBookManager = orderBookManager;
-		this.placeNewOrders = placeNewOrders;
+		this.strategy = strategy;
     }
 	
 	public Runnable create() {
 		return new KucoinEngine(restClient, wsClientPublic, wsClientPrivate, baseToken, quoteToken,
-				orders, orderBookManager, placeNewOrders);
+				orders, orderBookManager, strategy);
 	}
 }

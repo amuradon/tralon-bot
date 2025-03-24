@@ -17,6 +17,7 @@ import com.kucoin.sdk.websocket.event.KucoinEvent;
 import com.kucoin.sdk.websocket.event.Level2ChangeEvent;
 import com.kucoin.sdk.websocket.event.OrderChangeEvent;
 
+import cz.amuradon.tralon.cexliquiditymining.strategies.Strategy;
 import io.quarkus.logging.Log;
 
 public class KucoinEngine implements Runnable {
@@ -50,13 +51,13 @@ public class KucoinEngine implements Runnable {
     
     private final BalanceHolder balanceHolder;
     
-    private final PlaceNewOrders placeNewOrders;
+    private final Strategy strategy;
     
     public KucoinEngine(final KucoinRestClient restClient, final KucoinPublicWSClient wsClientPublic,
     		final KucoinPrivateWSClient wsClientPrivate, final String baseToken, final String quoteToken,
     		final Map<String, Order> orders,
     		final OrderBookManager orderBookManager,
-    		final PlaceNewOrders placeNewOrders) {
+    		final Strategy strategy) {
 		this.restClient = restClient;
 		this.wsClientPublic = wsClientPublic;
 		this.wsClientPrivate = wsClientPrivate;
@@ -66,7 +67,7 @@ public class KucoinEngine implements Runnable {
 		this.orders = orders;
 		this.orderBookManager = orderBookManager;
 		this.balanceHolder = new BalanceHolder();
-		this.placeNewOrders = placeNewOrders;
+		this.strategy = strategy;
     }
 
     public void run() {
@@ -148,11 +149,11 @@ public class KucoinEngine implements Runnable {
     		balanceHolder.setBaseBalance(available);
     		LOGGER.info("Base balance changed {}: {}", baseToken, available);
     		// XXX is the split needed since Side is not passed as arg anymore
-    		placeNewOrders.processOrderChanges(balanceHolder);
+    		strategy.onBalanceUpdate(balanceHolder);
     	} else if (quoteToken.equalsIgnoreCase(accountBalance.token())) {
     		balanceHolder.setQuoteBalance(available);
     		LOGGER.info("Quote balance changed {}: {}", quoteToken, available);
-    		placeNewOrders.processOrderChanges(balanceHolder);
+    		strategy.onBalanceUpdate(balanceHolder);
     	}
     }
 }
