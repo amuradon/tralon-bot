@@ -1,14 +1,13 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
-	<groupId>cz.amuradon.tralon.cexliquidityminer</groupId>
-	<artifactId>cexliquidityminer</artifactId>
+	<groupId>cz.amuradon.tralon.cex-liquidity-mining-bot</groupId>
+	<artifactId>cex-liquidity-mining-agent</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<packaging>jar</packaging>
 
 	<properties>
 		<quarkus.platform.version>3.15.3</quarkus.platform.version>
-		<camel.quarkus.version>3.15.2</camel.quarkus.version>
 	</properties>
 
 	<dependencyManagement>
@@ -21,26 +20,12 @@
 				<scope>import</scope>
 			</dependency>
 			<dependency>
-				<groupId>io.quarkus.platform</groupId>
-				<artifactId>quarkus-camel-bom</artifactId>
-				<version>${quarkus.platform.version}</version>
-				<type>pom</type>
-				<scope>import</scope>
-			</dependency>
-			<dependency>
             	<groupId>org.junit</groupId>
             	<artifactId>junit-bom</artifactId>
             	<version>5.11.4</version>
             	<type>pom</type>
             	<scope>import</scope>
         	</dependency>
-
-			<!-- Logging -->
-			<dependency>
-				<groupId>org.slf4j</groupId>
-				<artifactId>slf4j-api</artifactId>
-				<version>2.0.16</version>
-			</dependency>
 
 			<!-- Testing -->
 			<!-- JUnit 5.10.3 has to stay due to quarkus-junit and mockito-junit transitive dependencies -->
@@ -86,75 +71,10 @@
 			<artifactId>quarkus-qute-web</artifactId>
 		</dependency>
 
-		<!-- Camel -->
-		<dependency>
-			<groupId>org.apache.camel.quarkus</groupId>
-			<artifactId>camel-quarkus-core</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.camel.quarkus</groupId>
-			<artifactId>camel-quarkus-seda</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.camel.quarkus</groupId>
-			<artifactId>camel-quarkus-bean</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.camel.quarkus</groupId>
-			<artifactId>camel-quarkus-controlbus</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.camel.quarkus</groupId>
-			<artifactId>camel-quarkus-log</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.camel.quarkus</groupId>
-			<artifactId>camel-quarkus-direct</artifactId>
-		</dependency>
-
-		<!--
-		<dependency>
-			<groupId>org.apache.camel.quarkus</groupId>
-			<artifactId>camel-quarkus-timer</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.camel.quarkus</groupId>
-    		<artifactId>camel-quarkus-vertx-http</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.camel.quarkus</groupId>
-    		<artifactId>camel-quarkus-jackson</artifactId>
-		</dependency>
-		<dependency>
-    		<groupId>org.apache.camel.quarkus</groupId>
-    		<artifactId>camel-quarkus-file</artifactId>
-		</dependency>
-
-		<dependency>
-			<groupId>org.apache.camel.quarkus</groupId>
-			<artifactId>camel-quarkus-telegram</artifactId>
-		</dependency>
-		
-		<dependency>
-			<groupId>org.apache.camel.quarkus</groupId>
-			<artifactId>camel-quarkus-jsonpath</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.camel.quarkus</groupId>
-			<artifactId>camel-quarkus-caffeine</artifactId>
-		</dependency>
-		-->
-
 		<dependency>
 			<groupId>com.kucoin</groupId>
 			<artifactId>kucoin-java-sdk</artifactId>
 			<version>1.0.15</version>
-		</dependency>
-
-		<!-- Logging -->
-		<dependency>
-			<groupId>org.slf4j</groupId>
-			<artifactId>slf4j-api</artifactId>
 		</dependency>
 
 		<!-- Testing -->
@@ -180,21 +100,10 @@
 			<artifactId>quarkus-junit5-mockito</artifactId>
 			<scope>test</scope>
 		</dependency>
-		<dependency>
-			<groupId>org.apache.camel.quarkus</groupId>
-			<artifactId>camel-quarkus-stub</artifactId>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.camel.quarkus</groupId>
-			<artifactId>camel-quarkus-mock</artifactId>
-			<scope>test</scope>
-		</dependency>
 		<!-- managed version comes from quarkus-bom ?! -->
 		<dependency>
 			<groupId>io.fabric8</groupId>
 			<artifactId>mockwebserver</artifactId>
-			<version>6.12.1</version>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>

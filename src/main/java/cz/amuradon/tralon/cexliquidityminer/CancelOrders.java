@@ -6,9 +6,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.apache.camel.Body;
-import org.apache.camel.Header;
-
 import com.kucoin.sdk.KucoinRestClient;
 
 import io.quarkus.logging.Log;
@@ -35,7 +32,7 @@ public class CancelOrders {
 		this.orders = orders;
     }
 
-    public void processOrderChanges(@Header("Side") Side side, @Body BigDecimal proposedPrice) {
+    public void processOrderChanges(Side side, BigDecimal proposedPrice) {
     	Map<String, Order> ordersBeKept = new ConcurrentHashMap<>();
         for (Entry<String, Order> entry: orders.entrySet()) {
         	Order order = entry.getValue();

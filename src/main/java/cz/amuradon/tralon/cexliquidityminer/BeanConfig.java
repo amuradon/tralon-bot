@@ -5,15 +5,13 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.apache.camel.spi.CamelEvent.CamelContextStartedEvent;
-
 import com.kucoin.sdk.KucoinClientBuilder;
 import com.kucoin.sdk.KucoinPrivateWSClient;
 import com.kucoin.sdk.KucoinPublicWSClient;
 import com.kucoin.sdk.KucoinRestClient;
 
+import io.quarkus.runtime.Startup;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.event.Observes;
 import jakarta.enterprise.inject.Produces;
 import jakarta.inject.Inject;
 
@@ -72,7 +70,8 @@ public class BeanConfig {
 		return proposals;
     }
 
-    public void onCamelContextStarted(@Observes CamelContextStartedEvent event) {
-        strategyFactory.create().run();
+    @Startup
+    public void start() {
+    	strategyFactory.create().run();
     }
 }

@@ -1,14 +1,10 @@
 package cz.amuradon.tralon.cexliquidityminer;
 
-import static cz.amuradon.tralon.cexliquidityminer.MyRouteBuilder.SEDA_PLACE_NEW_ORDERS;
-
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.Date;
-import java.util.List;
 import java.util.Map;
 
-import org.apache.camel.ProducerTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,7 +12,6 @@ import com.kucoin.sdk.KucoinPrivateWSClient;
 import com.kucoin.sdk.KucoinPublicWSClient;
 import com.kucoin.sdk.KucoinRestClient;
 import com.kucoin.sdk.rest.response.AccountBalancesResponse;
-import com.kucoin.sdk.rest.response.OrderBookResponse;
 import com.kucoin.sdk.websocket.event.AccountChangeEvent;
 import com.kucoin.sdk.websocket.event.KucoinEvent;
 import com.kucoin.sdk.websocket.event.Level2ChangeEvent;
@@ -49,28 +44,29 @@ public class KucoinStrategy {
 	
 	private final String symbol;
 	
-	private final ProducerTemplate producer;
-	
     private final Map<String, Order> orders;
     
     private final OrderBookManager orderBookManager;
     
     private final BalanceHolder balanceHolder;
     
+    private final PlaceNewOrders placeNewOrders;
+    
     public KucoinStrategy(final KucoinRestClient restClient, final KucoinPublicWSClient wsClientPublic,
     		final KucoinPrivateWSClient wsClientPrivate, final String baseToken, final String quoteToken,
-    		final ProducerTemplate producer, final Map<String, Order> orders,
-    		final OrderBookManager orderBookManager) {
+    		final Map<String, Order> orders,
+    		final OrderBookManager orderBookManager,
+    		final PlaceNewOrders placeNewOrders) {
 		this.restClient = restClient;
 		this.wsClientPublic = wsClientPublic;
 		this.wsClientPrivate = wsClientPrivate;
 		this.baseToken = baseToken;
 		this.quoteToken = quoteToken;
 		symbol = baseToken + "-" + quoteToken;
-		this.producer = producer;
 		this.orders = orders;
 		this.orderBookManager = orderBookManager;
 		this.balanceHolder = new BalanceHolder();
+		this.placeNewOrders = placeNewOrders;
     }
 
     public void run() {
@@ -80,7 +76,6 @@ public class KucoinStrategy {
         	wsClientPublic.onLevel2Data(this::onL2RT, symbol);
 
         	orderBookManager.createLocalOrderBook();
-        	producer.sendBody(MyRouteBuilder.DIRECT_START_L2_MARKET_UPDATE_ROUTE, null);
         	
         	// Get existing orders
         	restClient.orderAPI().listOrders(symbol, null, null, null, "active", null, null, 20, 1).getItems()
@@ -100,7 +95,7 @@ public class KucoinStrategy {
     				LOGGER.info("Available quote balance {}: {}", quoteToken, quoteBalance);
 	    		}
 	    	}
-	    	producer.sendBodyAndHeader(SEDA_PLACE_NEW_ORDERS, balanceHolder.clone(), "Side", Side.SELL);
+	    	placeNewOrders.processOrderChanges(balanceHolder.clone());
 
 	    	// Start balance websocket after initial call
 	    	wsClientPrivate.onAccountBalance(this::onAccountBalance);
@@ -115,13 +110,12 @@ public class KucoinStrategy {
     	
     	// XXX KuCoin imbecils do not parse timestamp from underlying message
     	long timestamp = new Date().getTime();
-    	
-    	event.getData().getChanges().getAsks().stream().forEach(l -> producer.sendBody(
-    			MyRouteBuilder.SEDA_LEVEL2_MARKET_UPDATE,
-    			new OrderBookUpdate(Long.parseLong(l.get(2)), new BigDecimal(l.get(0)),
-    					new BigDecimal(l.get(1)), Side.SELL, timestamp)));
-    	event.getData().getChanges().getBids().stream().forEach(l -> producer.sendBody(
-    			MyRouteBuilder.SEDA_LEVEL2_MARKET_UPDATE,
+
+    	// FIXME async processing? No queue for unprocessed data 
+    	event.getData().getChanges().getAsks().stream().forEach(l ->
+    		orderBookManager.processUpdate(new OrderBookUpdate(Long.parseLong(l.get(2)), new BigDecimal(l.get(0)),
+				new BigDecimal(l.get(1)), Side.SELL, timestamp)));
+    	event.getData().getChanges().getBids().stream().forEach(l -> orderBookManager.processUpdate(
     			new OrderBookUpdate(Long.parseLong(l.get(2)), new BigDecimal(l.get(0)),
     					new BigDecimal(l.get(1)), Side.BUY, timestamp)));
     }
@@ -157,12 +151,13 @@ public class KucoinStrategy {
 			BigDecimal baseBalance = data.getAvailable();
 			balanceHolder.setBaseBalance(baseBalance);
 			LOGGER.info("Base balance changed {}: {}", baseToken, baseBalance);
-			producer.sendBodyAndHeader(SEDA_PLACE_NEW_ORDERS, balanceHolder.clone(), "Side", Side.SELL);
+			// XXX is the split needed since Side is not passed as arg anymore
+			placeNewOrders.processOrderChanges(balanceHolder);
 		} else if (quoteToken.equalsIgnoreCase(data.getCurrency())) {
 			BigDecimal quoteBalance = data.getAvailable();
 			balanceHolder.setQuoteBalance(quoteBalance);
 			LOGGER.info("Quote balance changed {}: {}", quoteToken, quoteBalance);
-			producer.sendBodyAndHeader(SEDA_PLACE_NEW_ORDERS, balanceHolder.clone(), "Side", Side.BUY);
+			placeNewOrders.processOrderChanges(balanceHolder);
 		}
     }
 }

@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.apache.camel.ProducerTemplate;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import com.kucoin.sdk.KucoinRestClient;
@@ -32,7 +31,7 @@ public class OrderBookManager {
 	
 	private final int priceChangeDelayMs;
 	
-	private final ProducerTemplate producer;
+	private final CancelOrders cancelOrders;
 	
 	private final OrderBook orderBook;
 	
@@ -45,14 +44,14 @@ public class OrderBookManager {
 	public OrderBookManager(final KucoinRestClient restClient,
 			@ConfigProperty(name = "orderBookQuoteVolumeBefore") final int sideVolumeThreshold, 
 			@ConfigProperty(name = "priceChangeDelayMs") final int priceChangeDelayMs,
-    		final ProducerTemplate producer, final OrderBook orderBook,
+			final CancelOrders cancelOrders, final OrderBook orderBook,
     		final Map<Side, PriceProposal> proposals,
     		@ConfigProperty(name = "baseToken") String baseToken,
     		@ConfigProperty(name = "quoteToken") String quoteToken) {
 		this.restClient = restClient;
 		this.sideVolumeThreshold = new BigDecimal(sideVolumeThreshold);
 		this.priceChangeDelayMs = priceChangeDelayMs;
-		this.producer = producer;
+		this.cancelOrders = cancelOrders;
 		this.orderBook = orderBook;
 		this.proposals = proposals;
 		symbol = baseToken + "-" + quoteToken;
@@ -102,8 +101,7 @@ public class OrderBookManager {
 					proposal.currentPrice = proposal.proposedPrice;
 					proposal.timestamp = Long.MAX_VALUE - priceChangeDelayMs;
 					
-					producer.sendBodyAndHeader(MyRouteBuilder.SEDA_CANCEL_ORDERS,
-							proposal.proposedPrice, "Side", side);
+					cancelOrders.processOrderChanges(side, proposal.proposedPrice);
 				}
 			}
 		}

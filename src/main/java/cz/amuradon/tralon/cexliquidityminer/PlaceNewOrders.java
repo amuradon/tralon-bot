@@ -3,35 +3,22 @@ package cz.amuradon.tralon.cexliquidityminer;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.Date;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
-import org.apache.camel.Body;
-import org.apache.camel.Header;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.kucoin.sdk.KucoinPrivateWSClient;
-import com.kucoin.sdk.KucoinPublicWSClient;
 import com.kucoin.sdk.KucoinRestClient;
 import com.kucoin.sdk.rest.request.OrderCreateApiRequest;
 import com.kucoin.sdk.rest.response.OrderCreateResponse;
 
-import io.quarkus.runtime.annotations.RegisterForReflection;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import jakarta.inject.Named;
 
 @ApplicationScoped
-@Named(PlaceNewOrders.BEAN_NAME)
-@RegisterForReflection
 public class PlaceNewOrders {
-	
-	public static final String BEAN_NAME = "PlaceNewOrders";
 	
 	private static final String LIMIT = "limit";
 
@@ -61,7 +48,7 @@ public class PlaceNewOrders {
 		this.priceProposals = priceProposals;
     }
 
-    public void processOrderChanges(@Header("Side") Side side, @Body BalanceHolder balanceHolder) {
+    public void processOrderChanges(BalanceHolder balanceHolder) {
       	BigDecimal baseBalanceSnapshot = balanceHolder.getBaseBalance();
        	BigDecimal quoteBalanceSnapshot = balanceHolder.getQuoteBalance();
        	
