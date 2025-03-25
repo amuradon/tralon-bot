@@ -20,6 +20,8 @@ import jakarta.inject.Inject;
 @ApplicationScoped
 public class BeanConfig {
 
+	public static final String STRATEGY = "MarketMakingStrategy";
+	
 	private final KucoinClientBuilder kucoinClientBuilder;
 	
 	private final KucoinEngineFactory strategyFactory;

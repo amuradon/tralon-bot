@@ -44,7 +44,7 @@ public class OrderBookManager {
 			final OrderBook orderBook,
     		@ConfigProperty(name = "baseToken") String baseToken,
     		@ConfigProperty(name = "quoteToken") String quoteToken,
-    		final Strategy strategy) {
+    		@Named(BeanConfig.STRATEGY) final Strategy strategy) {
 		this.restClient = restClient;
 		this.orderBook = orderBook;
 		this.strategy = strategy;

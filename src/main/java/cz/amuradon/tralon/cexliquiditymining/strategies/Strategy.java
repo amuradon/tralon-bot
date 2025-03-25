@@ -3,7 +3,6 @@ package cz.amuradon.tralon.cexliquiditymining.strategies;
 import java.math.BigDecimal;
 import java.util.Map;
 
-import cz.amuradon.tralon.cexliquiditymining.BalanceHolder;
 import cz.amuradon.tralon.cexliquiditymining.OrderBook;
 import cz.amuradon.tralon.cexliquiditymining.OrderBookUpdate;
 
@@ -13,5 +12,7 @@ public interface Strategy {
 	
 	void computeInitialPrices(OrderBook orderBook);
 	
-	void onBalanceUpdate(BalanceHolder balanceHolder);
+	void onBaseBalanceUpdate(BigDecimal balance);
+	
+	void onQuoteBalanceUpdate(BigDecimal balance);
 }

@@ -49,8 +49,6 @@ public class KucoinEngine implements Runnable {
     
     private final OrderBookManager orderBookManager;
     
-    private final BalanceHolder balanceHolder;
-    
     private final Strategy strategy;
     
     public KucoinEngine(final KucoinRestClient restClient, final KucoinPublicWSClient wsClientPublic,
@@ -66,7 +64,6 @@ public class KucoinEngine implements Runnable {
 		symbol = baseToken + "-" + quoteToken;
 		this.orders = orders;
 		this.orderBookManager = orderBookManager;
-		this.balanceHolder = new BalanceHolder();
 		this.strategy = strategy;
     }
 
@@ -125,7 +122,7 @@ public class KucoinEngine implements Runnable {
     					new Order(data.getOrderId(), Side.getValue(data.getSide()), data.getSize(), data.getPrice()));
     		} else if ("filled".equalsIgnoreCase(changeType)) {
     			orders.remove(data.getOrderId());
-    		} else if ("cancelled".equalsIgnoreCase(changeType)) {
+    		} else if ("canceled".equalsIgnoreCase(changeType)) {
     			// The orders are removed immediately once cancelled, this is to cover manual cancel
     			orders.remove(data.getOrderId());
     		} else if ("match".equalsIgnoreCase(changeType)) {
@@ -146,14 +143,12 @@ public class KucoinEngine implements Runnable {
     	String token = accountBalance.token();
     	BigDecimal available = accountBalance.available();
 		if (baseToken.equalsIgnoreCase(token)) {
-    		balanceHolder.setBaseBalance(available);
     		LOGGER.info("Base balance changed {}: {}", baseToken, available);
     		// XXX is the split needed since Side is not passed as arg anymore
-    		strategy.onBalanceUpdate(balanceHolder);
+    		strategy.onBaseBalanceUpdate(available);
     	} else if (quoteToken.equalsIgnoreCase(accountBalance.token())) {
-    		balanceHolder.setQuoteBalance(available);
     		LOGGER.info("Quote balance changed {}: {}", quoteToken, available);
-    		strategy.onBalanceUpdate(balanceHolder);
+    		strategy.onQuoteBalanceUpdate(available);
     	}
     }
 }

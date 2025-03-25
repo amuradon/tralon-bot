@@ -11,6 +11,7 @@ import com.kucoin.sdk.KucoinRestClient;
 import cz.amuradon.tralon.cexliquiditymining.strategies.Strategy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.inject.Named;
 
 
 @ApplicationScoped
@@ -40,7 +41,7 @@ public class KucoinEngineFactory {
     		@ConfigProperty(name = "quoteToken") String quoteToken,
     		final Map<String, Order> orders,
     		final OrderBookManager orderBookManager,
-    		final Strategy strategy) {
+    		@Named(BeanConfig.STRATEGY) final Strategy strategy) {
 		this.restClient = restClient;
 		this.wsClientPublic = wsClientPublic;
 		this.wsClientPrivate = wsClientPrivate;
