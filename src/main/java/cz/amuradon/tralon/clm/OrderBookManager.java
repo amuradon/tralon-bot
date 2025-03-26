@@ -1,4 +1,4 @@
-package cz.amuradon.tralon.cexliquiditymining;
+package cz.amuradon.tralon.clm;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -12,7 +12,8 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import com.kucoin.sdk.KucoinRestClient;
 import com.kucoin.sdk.rest.response.OrderBookResponse;
 
-import cz.amuradon.tralon.cexliquiditymining.strategies.Strategy;
+import cz.amuradon.tralon.clm.connector.OrderBookUpdate;
+import cz.amuradon.tralon.clm.strategies.Strategy;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.annotations.RegisterForReflection;
 import jakarta.enterprise.context.ApplicationScoped;

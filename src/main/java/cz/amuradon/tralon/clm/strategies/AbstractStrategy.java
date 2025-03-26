@@ -1,6 +1,5 @@
-package cz.amuradon.tralon.cexliquiditymining.strategies;
+package cz.amuradon.tralon.clm.strategies;
 
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Date;
@@ -13,22 +12,19 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-import com.kucoin.sdk.KucoinRestClient;
-import com.kucoin.sdk.rest.request.OrderCreateApiRequest;
-import com.kucoin.sdk.rest.response.OrderCreateResponse;
-
-import cz.amuradon.tralon.cexliquiditymining.Order;
-import cz.amuradon.tralon.cexliquiditymining.OrderBook;
-import cz.amuradon.tralon.cexliquiditymining.OrderBookUpdate;
-import cz.amuradon.tralon.cexliquiditymining.PriceProposal;
-import cz.amuradon.tralon.cexliquiditymining.Side;
+import cz.amuradon.tralon.clm.Order;
+import cz.amuradon.tralon.clm.OrderBook;
+import cz.amuradon.tralon.clm.PriceProposal;
+import cz.amuradon.tralon.clm.Side;
+import cz.amuradon.tralon.clm.connector.OrderBookUpdate;
+import cz.amuradon.tralon.clm.connector.RestClient;
 import io.quarkus.logging.Log;
 
 public abstract class AbstractStrategy implements Strategy {
 
 	private static final String LIMIT = "limit";
 	
-	private final KucoinRestClient restClient;
+	private final RestClient restClient;
     
 	private final String symbol;
 	
@@ -47,7 +43,7 @@ public abstract class AbstractStrategy implements Strategy {
     public AbstractStrategy(
     		final int priceChangeDelayMs,
     		final Map<Side, PriceProposal> priceProposals,
-    		final KucoinRestClient restClient,
+    		final RestClient restClient,
     		final String baseToken,
     		final String quoteToken,
     		final int maxBalanceToUse,
@@ -160,24 +156,19 @@ public abstract class AbstractStrategy implements Strategy {
 	}
     
 	String placeOrder(Side side, BigDecimal price, BigDecimal size) {
-		try {
-			final String clientOrderId = UUID.randomUUID().toString();
-			Log.infof("Placing new limit order - clOrdId: %s, side: %s, price: %s, size: %s",
-					clientOrderId, side, price, size);
-			OrderCreateResponse response;
-			response = restClient.orderAPI().createOrder(OrderCreateApiRequest.builder()
-					.clientOid(clientOrderId)
-					.side(side.name().toLowerCase())
-					.symbol(symbol)
-					.price(price)
-					.size(size)
-					.type(LIMIT)
-					.build());
-			orders.put(response.getOrderId(), new Order(response.getOrderId(), Side.SELL, size, price));
-			return clientOrderId;
-		} catch (IOException e) {
-			throw new IllegalStateException("Could not place order", e);
-		}
+		final String clientOrderId = UUID.randomUUID().toString();
+		Log.infof("Placing new limit order - clOrdId: %s, side: %s, price: %s, size: %s",
+				clientOrderId, side, price, size);
+		String orderId = restClient.newOrder()
+				.clientOrderId(clientOrderId)
+				.side(side)
+				.symbol(symbol)
+				.price(price)
+				.size(size)
+				.type(LIMIT)
+				.send();
+		orders.put(orderId, new Order(orderId, Side.SELL, size, price));
+		return clientOrderId;
 	}
 	
 	void cancelOrders(Side side) {
@@ -186,12 +177,8 @@ public abstract class AbstractStrategy implements Strategy {
         for (Entry<String, Order> entry: orders.entrySet()) {
         	Order order = entry.getValue();
         	if (side == order.side() && order.price().compareTo(proposedPrice) != 0) {
-        		try {
-        			Log.infof("Cancelling order %s", order);
-					restClient.orderAPI().cancelOrder(order.orderId());
-				} catch (IOException e) {
-					throw new IllegalStateException("Could not cancel an order " + order.orderId(), e);
-				}
+    			Log.infof("Cancelling order %s", order);
+				restClient.cancelOrder(order.orderId());
         	} else {
         		ordersBeKept.put(entry.getKey(), order);
         	}

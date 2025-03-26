@@ -1,27 +1,23 @@
-package cz.amuradon.tralon.cexliquiditymining;
+package cz.amuradon.tralon.clm;
 
 import java.util.Map;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-import com.kucoin.sdk.KucoinPrivateWSClient;
-import com.kucoin.sdk.KucoinPublicWSClient;
-import com.kucoin.sdk.KucoinRestClient;
-
-import cz.amuradon.tralon.cexliquiditymining.strategies.Strategy;
+import cz.amuradon.tralon.clm.connector.RestClient;
+import cz.amuradon.tralon.clm.connector.WebsocketClient;
+import cz.amuradon.tralon.clm.strategies.Strategy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 
 
 @ApplicationScoped
-public class KucoinEngineFactory {
+public class EngineFactory {
 
-	private final KucoinRestClient restClient;
+	private final RestClient restClient;
     
-    private final KucoinPublicWSClient wsClientPublic;
-    
-	private final KucoinPrivateWSClient wsClientPrivate;
+	private final WebsocketClient websocketClient;
 	
 	private final String baseToken;
 	
@@ -34,17 +30,15 @@ public class KucoinEngineFactory {
 	private final Strategy strategy;
 	
 	@Inject
-    public KucoinEngineFactory(final KucoinRestClient restClient,
-    		final KucoinPublicWSClient wsClientPublic,
-    		final KucoinPrivateWSClient wsClientPrivate,
+    public EngineFactory(final RestClient restClient,
+    		final WebsocketClient websocketClient,
     		@ConfigProperty(name = "baseToken") String baseToken,
     		@ConfigProperty(name = "quoteToken") String quoteToken,
     		final Map<String, Order> orders,
     		final OrderBookManager orderBookManager,
     		@Named(BeanConfig.STRATEGY) final Strategy strategy) {
 		this.restClient = restClient;
-		this.wsClientPublic = wsClientPublic;
-		this.wsClientPrivate = wsClientPrivate;
+		this.websocketClient = websocketClient;
 		this.baseToken = baseToken;
 		this.quoteToken = quoteToken;
 		this.orders = orders;
@@ -53,7 +47,7 @@ public class KucoinEngineFactory {
     }
 	
 	public Runnable create() {
-		return new KucoinEngine(restClient, wsClientPublic, wsClientPrivate, baseToken, quoteToken,
+		return new Engine(restClient, websocketClient, baseToken, quoteToken,
 				orders, orderBookManager, strategy);
 	}
 }

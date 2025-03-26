@@ -1,4 +1,4 @@
-package cz.amuradon.tralon.cexliquiditymining.strategies;
+package cz.amuradon.tralon.clm.strategies;
 
 import java.math.BigDecimal;
 import java.util.Map;
@@ -7,11 +7,10 @@ import java.util.concurrent.ScheduledExecutorService;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-import com.kucoin.sdk.KucoinRestClient;
-
-import cz.amuradon.tralon.cexliquiditymining.Order;
-import cz.amuradon.tralon.cexliquiditymining.PriceProposal;
-import cz.amuradon.tralon.cexliquiditymining.Side;
+import cz.amuradon.tralon.clm.Order;
+import cz.amuradon.tralon.clm.PriceProposal;
+import cz.amuradon.tralon.clm.Side;
+import cz.amuradon.tralon.clm.connector.RestClient;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
@@ -28,7 +27,7 @@ public class WallBeforeStrategy extends AbstractStrategy {
     		@ConfigProperty(name = "orderBookQuoteVolumeBefore") final int sideVolumeThreshold, 
     		@ConfigProperty(name = "priceChangeDelayMs") final int priceChangeDelayMs,
     		final Map<Side, PriceProposal> priceProposals,
-    		final KucoinRestClient restClient,
+    		final RestClient restClient,
     		@ConfigProperty(name = "baseToken") final String baseToken,
     		@ConfigProperty(name = "quoteToken") final String quoteToken,
     		@ConfigProperty(name = "maxQuoteBalanceToUse") final int maxBalanceToUse,

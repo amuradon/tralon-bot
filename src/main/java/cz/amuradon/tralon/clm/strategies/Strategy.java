@@ -1,10 +1,10 @@
-package cz.amuradon.tralon.cexliquiditymining.strategies;
+package cz.amuradon.tralon.clm.strategies;
 
 import java.math.BigDecimal;
 import java.util.Map;
 
-import cz.amuradon.tralon.cexliquiditymining.OrderBook;
-import cz.amuradon.tralon.cexliquiditymining.OrderBookUpdate;
+import cz.amuradon.tralon.clm.OrderBook;
+import cz.amuradon.tralon.clm.connector.OrderBookUpdate;
 
 public interface Strategy {
 

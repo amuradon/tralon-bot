@@ -1,4 +1,4 @@
-package cz.amuradon.tralon.cexliquiditymining;
+package cz.amuradon.tralon.clm;
 
 
 import java.io.IOException;
@@ -10,8 +10,6 @@ import com.kucoin.sdk.KucoinPrivateWSClient;
 import com.kucoin.sdk.KucoinPublicWSClient;
 import com.kucoin.sdk.KucoinRestClient;
 
-import cz.amuradon.tralon.cexliquiditymining.strategies.Strategy;
-import cz.amuradon.tralon.cexliquiditymining.strategies.WallBeforeStrategy;
 import io.quarkus.runtime.Startup;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Produces;
@@ -24,10 +22,10 @@ public class BeanConfig {
 	
 	private final KucoinClientBuilder kucoinClientBuilder;
 	
-	private final KucoinEngineFactory strategyFactory;
+	private final EngineFactory strategyFactory;
 	
 	@Inject
-	public BeanConfig(final KucoinEngineFactory strategyFactory) {
+	public BeanConfig(final EngineFactory strategyFactory) {
 		this.strategyFactory = strategyFactory;
 		kucoinClientBuilder = new KucoinClientBuilder().withBaseUrl("https://openapi-v2.kucoin.com")
                 .withApiKey("67e12bcf6fb8e00001f0cda5", "84b9d7b5-4bcc-46dc-a549-bc2677e674ea", "K1986dub27");
