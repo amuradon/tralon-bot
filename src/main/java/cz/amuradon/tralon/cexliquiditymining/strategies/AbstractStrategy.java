@@ -4,10 +4,14 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 import com.kucoin.sdk.KucoinRestClient;
 import com.kucoin.sdk.rest.request.OrderCreateApiRequest;
@@ -35,6 +39,10 @@ public abstract class AbstractStrategy implements Strategy {
     private final Map<Side, PriceProposal> priceProposals;
     
 	private final BigDecimal maxBalanceToUse;
+	
+	private final ScheduledExecutorService scheduler;
+
+	private final Map<Side, ScheduledFuture<?>> cancelOrdersTasks;
     
     public AbstractStrategy(
     		final int priceChangeDelayMs,
@@ -43,46 +51,47 @@ public abstract class AbstractStrategy implements Strategy {
     		final String baseToken,
     		final String quoteToken,
     		final int maxBalanceToUse,
-    		final Map<String, Order> orders) {
+    		final Map<String, Order> orders,
+    		final ScheduledExecutorService scheduler) {
 		this.restClient = restClient;
 		this.symbol = baseToken + "-" + quoteToken;
 		this.orders = orders;
 		this.priceChangeDelayMs = priceChangeDelayMs;
 		this.priceProposals = priceProposals;
 		this.maxBalanceToUse = new BigDecimal(maxBalanceToUse);
+		this.scheduler = scheduler;
+		cancelOrdersTasks = new HashMap<>();
 	}
 	
     @Override
 	public void onOrderBookUpdate(OrderBookUpdate update, Map<BigDecimal, BigDecimal> orderBookSide) {
 		Side side = update.side();
 		PriceProposal proposal = priceProposals.get(side);
-		
-		// TODO do as little computation as possible, if there is no change, no computation
+		// TODO timestamp z update -> nezpracovat starsi update?
+		// Serves as monitor for all things on the same side
 		synchronized (proposal) {
 			if (!side.isPriceOutOfRange(update.price(), proposal.currentPrice)) {
-				long timestamp = update.time();
-				
 				
 				BigDecimal targetPrice = getTargetPriceLevel(orderBookSide);
 				
-				Log.debugf("Target %s price: %s", side, targetPrice);
+				Log.debugf("Target %s price: %s, proposal: %s", side, targetPrice, proposal);
 				
+				// FIXME scheduling nefunguje
+				proposal.proposedPrice = targetPrice;
+				ScheduledFuture<?> cancelOrdersTask = cancelOrdersTasks.get(side);
 				if (proposal.currentPrice.compareTo(targetPrice) != 0) {
-					if (proposal.proposedPrice.compareTo(targetPrice) != 0) {
-						proposal.proposedPrice = targetPrice;
-						proposal.timestamp = timestamp;
+					if (cancelOrdersTask == null) {
+						Log.debugf("Scheduling job for %s", side);
+						cancelOrdersTask = scheduler.schedule(() -> cancelOrders(side),
+							priceChangeDelayMs, TimeUnit.MILLISECONDS);
+						cancelOrdersTasks.put(side, cancelOrdersTask);
 					}
-				} else if (proposal.proposedPrice.compareTo(proposal.currentPrice) != 0) {
-					proposal.proposedPrice = proposal.currentPrice;
-					proposal.timestamp = Long.MAX_VALUE - priceChangeDelayMs;
-				}
-				// TODO priceChangeDelayMs nefunguje spravne, reaguje az na novy update, nutno pouzit casovac
-				if (timestamp >= proposal.timestamp + priceChangeDelayMs) {
-					
-					proposal.currentPrice = proposal.proposedPrice;
-					proposal.timestamp = Long.MAX_VALUE - priceChangeDelayMs;
-					
-					cancelOrders(side, proposal.proposedPrice);
+				} else {
+					if (cancelOrdersTask != null) {
+						Log.debugf("Cancelling job for %s", side);
+						cancelOrdersTask.cancel(false);
+						cancelOrdersTasks.remove(side);
+					}
 				}
 			}
 		}
@@ -109,42 +118,44 @@ public abstract class AbstractStrategy implements Strategy {
 		
 	}
 
-	// FIXME udelal jsem SELL order, ale neprisel mi VERSE balance update, pri USDT balance update se pokusil zalozit
-	// zase novy SELL order a to spadlo na nedostatek balance -> cist aktualni balance pres REST API
-	// FIXME nekde je neco spatne, dostanu se do chvile, kdy se zrusi ordery a nove se nezalozi
+	// FIXME Na Kucoin nechodi balance updates spolehlive!
 	@Override
 	public void onBaseBalanceUpdate(BigDecimal balance) {
-       	BigDecimal askPriceProposal;
-       	synchronized (priceProposals) {
-       		askPriceProposal = priceProposals.get(Side.SELL).proposedPrice;
-		}
-        
-		if (balance.compareTo(BigDecimal.ZERO) > 0) {
-			placeOrder(Side.SELL, askPriceProposal, balance);
-		} else {
-			Log.info("No new sell orders placed");
-		}
+       	PriceProposal priceProposal = priceProposals.get(Side.SELL);
+       	
+       	synchronized (priceProposal) {
+			BigDecimal askPriceProposal = priceProposal.proposedPrice;
+			priceProposal.currentPrice = askPriceProposal;
+	        
+			if (balance.compareTo(BigDecimal.ZERO) > 0) {
+				placeOrder(Side.SELL, askPriceProposal, balance);
+			} else {
+				Log.info("No new sell orders placed");
+			}
+       	}
     }
 
 	@Override
 	public void onQuoteBalanceUpdate(BigDecimal balance) {
-		BigDecimal bidPriceProposal;
-		synchronized (priceProposals) {
-			bidPriceProposal = priceProposals.get(Side.BUY).proposedPrice;
-		}
+		PriceProposal priceProposal = priceProposals.get(Side.BUY);
 		
-		BigDecimal balanceQuoteLeftForBids = maxBalanceToUse;
-		for (Order order : orders.values()) {
-			balanceQuoteLeftForBids = balanceQuoteLeftForBids.subtract(order.price().multiply(order.size()));
-		}
-		balanceQuoteLeftForBids = balanceQuoteLeftForBids.min(balance);
-		
-		// TODO get correct scale from exchange
-		BigDecimal size = balanceQuoteLeftForBids.divide(bidPriceProposal, 4, RoundingMode.FLOOR);
-		if (size.compareTo(BigDecimal.ZERO) > 0) {
-			placeOrder(Side.BUY, bidPriceProposal, size);
-		} else {
-			Log.info("No new buy orders placed");
+		synchronized (priceProposal) {
+			BigDecimal bidPriceProposal = priceProposal.proposedPrice;
+			priceProposal.currentPrice = bidPriceProposal;
+			
+			BigDecimal balanceQuoteLeftForBids = maxBalanceToUse;
+			for (Order order : orders.values()) {
+				balanceQuoteLeftForBids = balanceQuoteLeftForBids.subtract(order.price().multiply(order.size()));
+			}
+			balanceQuoteLeftForBids = balanceQuoteLeftForBids.min(balance);
+			
+			// TODO get correct scale from exchange
+			BigDecimal size = balanceQuoteLeftForBids.divide(bidPriceProposal, 4, RoundingMode.FLOOR);
+			if (size.compareTo(BigDecimal.ZERO) > 0) {
+				placeOrder(Side.BUY, bidPriceProposal, size);
+			} else {
+				Log.info("No new buy orders placed");
+			}
 		}
 	}
     
@@ -169,7 +180,8 @@ public abstract class AbstractStrategy implements Strategy {
 		}
 	}
 	
-	void cancelOrders(Side side, BigDecimal proposedPrice) {
+	void cancelOrders(Side side) {
+		BigDecimal proposedPrice = priceProposals.get(side).proposedPrice;
     	Map<String, Order> ordersBeKept = new ConcurrentHashMap<>();
         for (Entry<String, Order> entry: orders.entrySet()) {
         	Order order = entry.getValue();

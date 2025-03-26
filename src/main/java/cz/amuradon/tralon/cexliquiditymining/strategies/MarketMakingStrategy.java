@@ -2,6 +2,7 @@ package cz.amuradon.tralon.cexliquiditymining.strategies;
 
 import java.math.BigDecimal;
 import java.util.Map;
+import java.util.concurrent.ScheduledExecutorService;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
@@ -27,8 +28,10 @@ public class MarketMakingStrategy extends AbstractStrategy {
     		@ConfigProperty(name = "baseToken") final String baseToken,
     		@ConfigProperty(name = "quoteToken") final String quoteToken,
     		@ConfigProperty(name = "maxQuoteBalanceToUse") final int maxBalanceToUse,
-    		final Map<String, Order> orders) {
-    	super(priceChangeDelayMs, priceProposals, restClient, baseToken, quoteToken, maxBalanceToUse, orders);
+    		final Map<String, Order> orders,
+    		final ScheduledExecutorService scheduler) {
+    	super(priceChangeDelayMs, priceProposals, restClient, baseToken, quoteToken,
+    			maxBalanceToUse, orders, scheduler);
 	}
 
     /*

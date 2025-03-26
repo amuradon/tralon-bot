@@ -1,4 +1,4 @@
-package cz.amuradon.tralon.cexliquidityminer;
+package cz.amuradon.tralon.cexliquiditymining;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
