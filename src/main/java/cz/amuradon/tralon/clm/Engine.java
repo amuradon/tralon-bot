@@ -11,6 +11,8 @@ import cz.amuradon.tralon.clm.connector.OrderBookChange;
 import cz.amuradon.tralon.clm.connector.OrderChange;
 import cz.amuradon.tralon.clm.connector.RestClient;
 import cz.amuradon.tralon.clm.connector.WebsocketClient;
+import cz.amuradon.tralon.clm.model.Order;
+import cz.amuradon.tralon.clm.model.OrderImpl;
 import cz.amuradon.tralon.clm.strategies.Strategy;
 
 public class Engine implements Runnable {
@@ -88,35 +90,36 @@ public class Engine implements Runnable {
     }
     
     private void onOrderChange(OrderChange data) {
-		String changeType = data.getType();
-		if (symbol.equalsIgnoreCase(data.getSymbol())) {
+		OrderStatus orderStatus = data.status();
+		if (symbol.equalsIgnoreCase(data.symbol())) {
 			// Open order are added and cancelled are removed immediately when request sent over REST API
 			// but this is to sync server state as well as record any manual intervention
 			
-    		if ("open".equalsIgnoreCase(changeType)) {
-    			orders.put(data.getOrderId(), 
-    					new Order(data.getOrderId(), Side.getValue(data.getSide()), data.getSize(), data.getPrice()));
-    		} else if ("filled".equalsIgnoreCase(changeType)) {
-    			orders.remove(data.getOrderId());
-    		} else if ("canceled".equalsIgnoreCase(changeType)) {
+    		if (orderStatus == OrderStatus.NEW) {
+    			orders.put(data.orderId(), 
+    					new OrderImpl(data.orderId(), data.symbol(),
+    							Side.getValue(data.side()), data.size(), data.price()));
+    		} else if (orderStatus == OrderStatus.FILLED) {
+    			orders.remove(data.orderId());
+    		} else if (orderStatus == OrderStatus.CANCELED) {
     			// The orders are removed immediately once cancelled, this is to cover manual cancel
-    			orders.remove(data.getOrderId());
-    		} else if ("match".equalsIgnoreCase(changeType)) {
-    			orders.get(data.getOrderId()).size(data.getRemainSize());
+    			orders.remove(data.orderId());
+    		} else if (orderStatus == OrderStatus.PARTIALLY_FILLED) {
+    			orders.get(data.orderId()).size(data.remainSize());
     		}
     	}
-		LOGGER.info("Order change: {}, ID: {}, type: {}", data.getOrderId(), changeType);
+		LOGGER.info("Order change: {}, ID: {}, type: {}", data.orderId(), orderStatus);
 		LOGGER.info("Orders in memory {}", orders);
     }
     
     private void onAccountBalance(AccountBalance accountBalance) {
-    	String token = accountBalance.token();
+    	String token = accountBalance.asset();
     	BigDecimal available = accountBalance.available();
 		if (baseToken.equalsIgnoreCase(token)) {
     		LOGGER.info("Base balance changed {}: {}", baseToken, available);
     		// XXX is the split needed since Side is not passed as arg anymore
     		strategy.onBaseBalanceUpdate(available);
-    	} else if (quoteToken.equalsIgnoreCase(accountBalance.token())) {
+    	} else if (quoteToken.equalsIgnoreCase(accountBalance.asset())) {
     		LOGGER.info("Quote balance changed {}: {}", quoteToken, available);
     		strategy.onQuoteBalanceUpdate(available);
     	}

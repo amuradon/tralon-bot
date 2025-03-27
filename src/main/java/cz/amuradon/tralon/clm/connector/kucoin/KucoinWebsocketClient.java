@@ -9,12 +9,12 @@ import cz.amuradon.tralon.clm.connector.AccountBalance;
 import cz.amuradon.tralon.clm.connector.OrderBookChange;
 import cz.amuradon.tralon.clm.connector.OrderChange;
 import cz.amuradon.tralon.clm.connector.WebsocketClient;
+import io.quarkus.arc.profile.IfBuildProfile;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import jakarta.inject.Named;
 
 @ApplicationScoped
-@Named("KucoinWebsocketClient")
+@IfBuildProfile("kucoin")
 public class KucoinWebsocketClient implements WebsocketClient {
 
 	private final KucoinPublicWSClient wsClientPublic;

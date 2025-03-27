@@ -9,16 +9,18 @@ import java.util.stream.Collectors;
 import com.kucoin.sdk.rest.request.OrderCreateApiRequest;
 import com.kucoin.sdk.rest.request.OrderCreateApiRequest.OrderCreateApiRequestBuilder;
 
-import cz.amuradon.tralon.clm.Order;
+import cz.amuradon.tralon.clm.OrderType;
 import cz.amuradon.tralon.clm.Side;
 import cz.amuradon.tralon.clm.connector.AccountBalance;
 import cz.amuradon.tralon.clm.connector.RestClient;
+import cz.amuradon.tralon.clm.model.Order;
+import cz.amuradon.tralon.clm.model.OrderImpl;
+import io.quarkus.arc.profile.IfBuildProfile;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import jakarta.inject.Named;
 
 @ApplicationScoped
-@Named("KucoinRestClient")
+@IfBuildProfile("kucoin")
 public class KucoinRestClient implements RestClient {
 
 	private final com.kucoin.sdk.KucoinRestClient restClient;
@@ -34,9 +36,9 @@ public class KucoinRestClient implements RestClient {
 	}
 	
 	@Override
-	public void cancelOrder(String orderId) {
+	public void cancelOrder(Order order) {
 		try {
-			restClient.orderAPI().cancelOrder(orderId);
+			restClient.orderAPI().cancelOrder(order.orderId());
 		} catch (IOException e) {
 			throw new IllegalStateException("Could not send cancel order request.", e);
 		}
@@ -47,7 +49,7 @@ public class KucoinRestClient implements RestClient {
 		try {
 			return restClient.orderAPI().listOrders(symbol, null, null, null, "active", null, null, 20, 1).getItems().stream()
 			.collect(Collectors.toMap(r -> r.getId(), r ->
-					new Order(r.getId(), Side.getValue(r.getSide()), r.getSize(), r.getPrice())));
+					new OrderImpl(r.getId(), r.getSymbol(), Side.getValue(r.getSide()), r.getSize(), r.getPrice())));
 		} catch (IOException e) {
 			throw new IllegalStateException("Could not list orders.", e);
 		}
@@ -98,8 +100,8 @@ public class KucoinRestClient implements RestClient {
 		}
 
 		@Override
-		public NewOrderBuilder type(String type) {
-			builder.type(type);
+		public NewOrderBuilder type(OrderType type) {
+			builder.type(type.name().toLowerCase());
 			return this;
 		}
 

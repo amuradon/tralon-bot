@@ -23,7 +23,7 @@ public class KucoinAccountBalance implements AccountBalance {
 	}
 
 	@Override
-	public String token() {
+	public String asset() {
 		return token;
 	}
 

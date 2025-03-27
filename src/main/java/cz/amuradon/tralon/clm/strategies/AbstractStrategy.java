@@ -12,12 +12,14 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-import cz.amuradon.tralon.clm.Order;
 import cz.amuradon.tralon.clm.OrderBook;
+import cz.amuradon.tralon.clm.OrderType;
 import cz.amuradon.tralon.clm.PriceProposal;
 import cz.amuradon.tralon.clm.Side;
 import cz.amuradon.tralon.clm.connector.OrderBookUpdate;
 import cz.amuradon.tralon.clm.connector.RestClient;
+import cz.amuradon.tralon.clm.model.Order;
+import cz.amuradon.tralon.clm.model.OrderImpl;
 import io.quarkus.logging.Log;
 
 public abstract class AbstractStrategy implements Strategy {
@@ -165,9 +167,9 @@ public abstract class AbstractStrategy implements Strategy {
 				.symbol(symbol)
 				.price(price)
 				.size(size)
-				.type(LIMIT)
+				.type(OrderType.LIMIT)
 				.send();
-		orders.put(orderId, new Order(orderId, Side.SELL, size, price));
+		orders.put(orderId, new OrderImpl(orderId, symbol, Side.SELL, size, price));
 		return clientOrderId;
 	}
 	
@@ -178,7 +180,7 @@ public abstract class AbstractStrategy implements Strategy {
         	Order order = entry.getValue();
         	if (side == order.side() && order.price().compareTo(proposedPrice) != 0) {
     			Log.infof("Cancelling order %s", order);
-				restClient.cancelOrder(order.orderId());
+				restClient.cancelOrder(order);
         	} else {
         		ordersBeKept.put(entry.getKey(), order);
         	}

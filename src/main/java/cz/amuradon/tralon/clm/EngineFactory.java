@@ -6,6 +6,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import cz.amuradon.tralon.clm.connector.RestClient;
 import cz.amuradon.tralon.clm.connector.WebsocketClient;
+import cz.amuradon.tralon.clm.model.Order;
 import cz.amuradon.tralon.clm.strategies.Strategy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;

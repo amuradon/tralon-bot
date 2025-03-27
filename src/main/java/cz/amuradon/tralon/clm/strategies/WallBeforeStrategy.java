@@ -7,10 +7,10 @@ import java.util.concurrent.ScheduledExecutorService;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-import cz.amuradon.tralon.clm.Order;
 import cz.amuradon.tralon.clm.PriceProposal;
 import cz.amuradon.tralon.clm.Side;
 import cz.amuradon.tralon.clm.connector.RestClient;
+import cz.amuradon.tralon.clm.model.Order;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;

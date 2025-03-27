@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 
 import com.kucoin.sdk.websocket.event.OrderChangeEvent;
 
+import cz.amuradon.tralon.clm.OrderStatus;
 import cz.amuradon.tralon.clm.connector.OrderChange;
 
 public class KucoinOrderChange implements OrderChange {
@@ -15,37 +16,48 @@ public class KucoinOrderChange implements OrderChange {
 	}
 
 	@Override
-	public String getType() {
-		return data.getType();
+	public OrderStatus status() {
+		if ("open".equalsIgnoreCase(data.getType())) {
+			return OrderStatus.NEW;
+		} else if ("match".equalsIgnoreCase(data.getType())) {
+			return OrderStatus.PARTIALLY_FILLED;
+		} else if ("filled".equalsIgnoreCase(data.getType())) {
+			return OrderStatus.FILLED;
+		} else if ("canceled".equalsIgnoreCase(data.getType())) {
+			return OrderStatus.CANCELED;
+		} else {
+			// XXX return something not used?
+			return OrderStatus.PENDING_CANCEL;
+		}
 	}
 
 	@Override
-	public String getSymbol() {
+	public String symbol() {
 		return data.getSymbol();
 	}
 
 	@Override
-	public String getOrderId() {
+	public String orderId() {
 		return data.getOrderId();
 	}
 
 	@Override
-	public String getSide() {
+	public String side() {
 		return data.getSide();
 	}
 
 	@Override
-	public BigDecimal getSize() {
+	public BigDecimal size() {
 		return data.getSize();
 	}
 
 	@Override
-	public BigDecimal getPrice() {
+	public BigDecimal price() {
 		return data.getPrice();
 	}
 
 	@Override
-	public BigDecimal getRemainSize() {
+	public BigDecimal remainSize() {
 		return data.getRemainSize();
 	}
 

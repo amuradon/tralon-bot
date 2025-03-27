@@ -2,20 +2,22 @@ package cz.amuradon.tralon.clm.connector;
 
 import java.math.BigDecimal;
 
+import cz.amuradon.tralon.clm.OrderStatus;
+
 public interface OrderChange {
 
-	String getType();
+	OrderStatus status();
 
-	String getSymbol();
+	String symbol();
 
-	String getOrderId();
+	String orderId();
 
-	String getSide();
+	String side();
 
-	BigDecimal getSize();
+	BigDecimal size();
 
-	BigDecimal getPrice();
+	BigDecimal price();
 
-	BigDecimal getRemainSize();
+	BigDecimal remainSize();
 
 }
