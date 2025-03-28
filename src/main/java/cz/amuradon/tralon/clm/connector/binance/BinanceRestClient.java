@@ -1,8 +1,10 @@
 package cz.amuradon.tralon.clm.connector.binance;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -11,7 +13,6 @@ import com.binance.connector.client.SpotClient;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.ImmutableMap;
 
 import cz.amuradon.tralon.clm.OrderType;
 import cz.amuradon.tralon.clm.Side;
@@ -32,6 +33,8 @@ public class BinanceRestClient implements RestClient {
 	
 	private final ObjectMapper mapper;
 	
+	private int sizeScale = 4;
+	
 	@Inject
 	public BinanceRestClient(SpotClient spotClient) {
 		this.spotClient = spotClient;
@@ -46,12 +49,12 @@ public class BinanceRestClient implements RestClient {
 	@Override
 	public void cancelOrder(Order order) {
 		spotClient.createTrade()
-			.cancelOrder(ImmutableMap.<String, Object>of("symbol", order.symbol(), "orderId", order.orderId()));
+			.cancelOrder(param("symbol", order.symbol()).param("orderId", order.orderId()));
 	}
 
 	@Override
 	public Map<String, Order> listOrders(String symbol) {
-		final String response = spotClient.createTrade().getOpenOrders(ImmutableMap.<String, Object>of("symbol", symbol));
+		final String response = spotClient.createTrade().getOpenOrders(param("symbol", symbol));
 		try {
 			return mapper.readValue(response, new TypeReference<List<BinanceOrder>>() { })
 					.stream().collect(Collectors.toMap(o -> o.orderId(), o -> o));
@@ -62,7 +65,7 @@ public class BinanceRestClient implements RestClient {
 
 	@Override
 	public List<? extends AccountBalance> listBalances() {
-		final String response = spotClient.createTrade().account(Collections.emptyMap());
+		final String response = spotClient.createTrade().account(new LinkedHashMap<>());
 		try {
 			return mapper.readValue(response, BinanceAccountInformation.class).balances();
 		} catch (JsonProcessingException e) {
@@ -73,14 +76,35 @@ public class BinanceRestClient implements RestClient {
 	@Override
 	public OrderBookResponse getOrderBook(String symbol) {
 		try {
-			String response = spotClient.createMarket().depth(
-					ImmutableMap.<String, Object>of("symbol", symbol, "limit", 5000));
+			String response = spotClient.createMarket().depth( param("symbol", symbol).param("limit", 5000));
 			BinanceOrderBookResponse orderBookResponse = mapper.readValue(response, BinanceOrderBookResponse.class);
 			return new OrderBookResponseImpl(orderBookResponse.sequence(),
 					orderBookResponse.asks(), orderBookResponse.bids());
 		} catch (JsonProcessingException e) {
 			throw new IllegalStateException("Could not read order book.", e);
 		}
+	}
+	
+	@Override
+	public void cacheSymbolDetails(String symbol) {
+		try {
+			String response = spotClient.createMarket().exchangeInfo(param("symbol", symbol));
+			ExchangeInfo exchangeInfo = mapper.readValue(response, ExchangeInfo.class);
+			for (SymbolInfo symbolInfo : exchangeInfo.symbols()) {
+				if (symbol.equalsIgnoreCase(symbolInfo.symbol())) {
+					for (Filter filter : symbolInfo.filters())
+						if ("LOT_SIZE".equalsIgnoreCase(filter.filterType)) {
+							String stepSize = filter.get("stepSize");
+							sizeScale = new BigDecimal(stepSize).stripTrailingZeros().scale();
+							break;
+						}
+					break;
+				}
+			}
+		} catch (JsonProcessingException e) {
+			throw new IllegalStateException("Could not read exchange info.", e);
+		}
+		
 	}
 
 	public final class BinanceNewOrderBuilder implements NewOrderBuilder {
@@ -113,7 +137,7 @@ public class BinanceRestClient implements RestClient {
 
 		@Override
 		public NewOrderBuilder size(BigDecimal size) {
-			parameters.put("quantity", size);
+			parameters.put("quantity", size.setScale(sizeScale, RoundingMode.DOWN));
 			return this;
 		}
 
@@ -130,7 +154,20 @@ public class BinanceRestClient implements RestClient {
 		public String send() {
 			return spotClient.createTrade().newOrder(parameters);
 		}
+	}
+	
+	private ParamsBuilder param(String key, Object value) {
+		return new ParamsBuilder().param(key, value);
+	}
+
+	private static final class ParamsBuilder extends LinkedHashMap<String, Object> {
 		
-		
+		private static final long serialVersionUID = 1L;
+
+		ParamsBuilder param(String key, Object value) {
+			put(key, value);
+			return this;
+		}
+
 	}
 }

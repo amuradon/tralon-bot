@@ -3,15 +3,20 @@ package cz.amuradon.tralon.clm.connector.kucoin;
 
 import java.io.IOException;
 
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+
 import com.kucoin.sdk.KucoinClientBuilder;
 import com.kucoin.sdk.KucoinPrivateWSClient;
 import com.kucoin.sdk.KucoinPublicWSClient;
 import com.kucoin.sdk.KucoinRestClient;
 
+import cz.amuradon.tralon.clm.BeanConfig;
 import io.quarkus.arc.profile.IfBuildProfile;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Produces;
 import jakarta.inject.Inject;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
 
 @ApplicationScoped
 @IfBuildProfile("kucoin")
@@ -49,6 +54,14 @@ public class KucoinBeanConfig {
 		} catch (IOException e) {
 			throw new IllegalStateException("Could not build public WS client", e);
 		}
+    }
+
+    @Singleton
+    @Produces
+    @Named(BeanConfig.SYMBOL)
+    public String symbol(@ConfigProperty(name = "baseToken") String baseToken,
+    		@ConfigProperty(name = "quoteToken") String quoteToken) {
+    	return baseToken + "-" + quoteToken;
     }
     
 }

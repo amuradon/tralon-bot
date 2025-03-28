@@ -17,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import com.binance.connector.client.SpotClient;
+import com.binance.connector.client.impl.spot.Market;
 import com.binance.connector.client.impl.spot.Trade;
 
 import cz.amuradon.tralon.clm.Side;
@@ -35,9 +36,13 @@ public class BinanceRestClientTest {
 	@Mock
 	private Trade tradeMock;
 	
+	@Mock
+	private Market marketMock;
+	
 	@BeforeEach
 	public void prepare() {
 		when(spotClientMock.createTrade()).thenReturn(tradeMock);
+		when(spotClientMock.createMarket()).thenReturn(marketMock);
 		client = new BinanceRestClient(spotClientMock);
 	}
 	
@@ -132,5 +137,28 @@ public class BinanceRestClientTest {
 		assertEquals("BTC", balance.asset());
 		assertEquals(new BigDecimal("4723846.89208129"), balance.available());
 		
+	}
+
+	@Test
+	public void testCacheSymbolDetails() {
+		// JSON simplified
+		when(marketMock.exchangeInfo(anyMap())).thenReturn(
+				"""
+				{
+				 "timezone":"UTC",
+				 "serverTime":1743167127054,
+				 "symbols":[
+				 {
+				  "symbol":"DCRUSDT",
+				  "filters":[
+				   {"filterType":"PRICE_FILTER","minPrice":"0.01000000","maxPrice":"100000.00000000","tickSize":"0.01000000"},
+				   {"filterType":"LOT_SIZE","minQty":"0.00100000","maxQty":"900000.00000000","stepSize":"0.00100000"}
+				  ]
+				 }
+				 ]
+				}
+				""");
+		
+		client.cacheSymbolDetails("DCRUSDT");
 	}
 }

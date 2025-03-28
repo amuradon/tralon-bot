@@ -10,8 +10,6 @@ import cz.amuradon.tralon.clm.model.Order;
 
 public interface RestClient {
 
-	NewOrderBuilder newOrder();
-	
 	void cancelOrder(Order order);
 	
 	Map<String, Order> listOrders(String symbol);
@@ -19,6 +17,10 @@ public interface RestClient {
 	List<? extends AccountBalance> listBalances();
 			
 	OrderBookResponse getOrderBook(String symbol);
+
+	void cacheSymbolDetails(String symbol);
+	
+	NewOrderBuilder newOrder();
 
 	interface NewOrderBuilder {
 		NewOrderBuilder clientOrderId(String clientOrderId);
@@ -29,5 +31,6 @@ public interface RestClient {
 		NewOrderBuilder type(OrderType type);
 		String send();
 	}
+
 
 }

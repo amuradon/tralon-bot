@@ -13,7 +13,7 @@ import jakarta.inject.Inject;
 @ApplicationScoped
 public class BeanConfig {
 
-	public static final String STRATEGY = "MarketMakingStrategy";
+	public static final String SYMBOL = "symbol";
 	
 	private final EngineFactory strategyFactory;
 	

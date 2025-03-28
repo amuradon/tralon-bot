@@ -24,8 +24,6 @@ import io.quarkus.logging.Log;
 
 public abstract class AbstractStrategy implements Strategy {
 
-	private static final String LIMIT = "limit";
-	
 	private final RestClient restClient;
     
 	private final String symbol;
@@ -46,13 +44,12 @@ public abstract class AbstractStrategy implements Strategy {
     		final int priceChangeDelayMs,
     		final Map<Side, PriceProposal> priceProposals,
     		final RestClient restClient,
-    		final String baseToken,
-    		final String quoteToken,
+    		final String symbol,
     		final int maxBalanceToUse,
     		final Map<String, Order> orders,
     		final ScheduledExecutorService scheduler) {
 		this.restClient = restClient;
-		this.symbol = baseToken + "-" + quoteToken;
+		this.symbol = symbol;
 		this.orders = orders;
 		this.priceChangeDelayMs = priceChangeDelayMs;
 		this.priceProposals = priceProposals;

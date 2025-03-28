@@ -48,6 +48,7 @@ public class Engine implements Runnable {
     		final WebsocketClient websocketClient,
     		final String baseToken,
     		final String quoteToken,
+    		final String symbol,
     		final Map<String, Order> orders,
     		final OrderBookManager orderBookManager,
     		final Strategy strategy) {
@@ -55,13 +56,15 @@ public class Engine implements Runnable {
 		this.websocketClient = websocketClient;
 		this.baseToken = baseToken;
 		this.quoteToken = quoteToken;
-		symbol = baseToken + "-" + quoteToken;
+		this.symbol = symbol;
 		this.orders = orders;
 		this.orderBookManager = orderBookManager;
 		this.strategy = strategy;
     }
 
     public void run() {
+    	restClient.cacheSymbolDetails(symbol);
+    	
     	// Start consuming data from websockets
     	websocketClient.onOrderChange(this::onOrderChange);
     	websocketClient.onLevel2Data(this::onL2RT, symbol);

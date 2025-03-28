@@ -24,6 +24,8 @@ public class EngineFactory {
 	
 	private final String quoteToken;
 	
+	private final String symbol;
+	
 	private final Map<String, Order> orders;
 	
 	private final OrderBookManager orderBookManager;
@@ -35,20 +37,22 @@ public class EngineFactory {
     		final WebsocketClient websocketClient,
     		@ConfigProperty(name = "baseToken") String baseToken,
     		@ConfigProperty(name = "quoteToken") String quoteToken,
+    		@Named(BeanConfig.SYMBOL) final String symbol,
     		final Map<String, Order> orders,
     		final OrderBookManager orderBookManager,
-    		@Named(BeanConfig.STRATEGY) final Strategy strategy) {
+    		final Strategy strategy) {
 		this.restClient = restClient;
 		this.websocketClient = websocketClient;
 		this.baseToken = baseToken;
 		this.quoteToken = quoteToken;
+		this.symbol = symbol;
 		this.orders = orders;
 		this.orderBookManager = orderBookManager;
 		this.strategy = strategy;
     }
 	
 	public Runnable create() {
-		return new Engine(restClient, websocketClient, baseToken, quoteToken,
+		return new Engine(restClient, websocketClient, baseToken, quoteToken, symbol,
 				orders, orderBookManager, strategy);
 	}
 }

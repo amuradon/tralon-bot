@@ -6,17 +6,19 @@ import java.util.concurrent.ScheduledExecutorService;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
+import cz.amuradon.tralon.clm.BeanConfig;
 import cz.amuradon.tralon.clm.PriceProposal;
 import cz.amuradon.tralon.clm.Side;
 import cz.amuradon.tralon.clm.connector.RestClient;
 import cz.amuradon.tralon.clm.model.Order;
+import io.quarkus.arc.profile.IfBuildProfile;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 
 //@Singleton required due to abstract parent class
 @Singleton
-@Named("MarketMakingStrategy")
+@IfBuildProfile("marketmaking")
 public class MarketMakingStrategy extends AbstractStrategy {
 
     @Inject
@@ -24,12 +26,11 @@ public class MarketMakingStrategy extends AbstractStrategy {
     		@ConfigProperty(name = "priceChangeDelayMs") final int priceChangeDelayMs,
     		final Map<Side, PriceProposal> priceProposals,
     		final RestClient restClient,
-    		@ConfigProperty(name = "baseToken") final String baseToken,
-    		@ConfigProperty(name = "quoteToken") final String quoteToken,
+    		@Named(BeanConfig.SYMBOL) final String symbol,
     		@ConfigProperty(name = "maxQuoteBalanceToUse") final int maxBalanceToUse,
     		final Map<String, Order> orders,
     		final ScheduledExecutorService scheduler) {
-    	super(priceChangeDelayMs, priceProposals, restClient, baseToken, quoteToken,
+    	super(priceChangeDelayMs, priceProposals, restClient, symbol,
     			maxBalanceToUse, orders, scheduler);
 	}
 

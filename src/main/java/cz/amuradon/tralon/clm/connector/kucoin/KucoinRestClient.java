@@ -78,6 +78,11 @@ public class KucoinRestClient implements RestClient {
 		}
 	}
 	
+	@Override
+	public void cacheSymbolDetails(String symbol) {
+		// TODO implement
+	}
+	
 	public final class KucoinNewOrderBuilder implements NewOrderBuilder {
 		
 		OrderCreateApiRequestBuilder builder = OrderCreateApiRequest.builder();

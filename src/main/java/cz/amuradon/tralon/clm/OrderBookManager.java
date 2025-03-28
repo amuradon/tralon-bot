@@ -41,13 +41,12 @@ public class OrderBookManager {
 	@Inject
 	public OrderBookManager(final RestClient restClient,
 			final OrderBook orderBook,
-    		@ConfigProperty(name = "baseToken") String baseToken,
-    		@ConfigProperty(name = "quoteToken") String quoteToken,
-    		@Named(BeanConfig.STRATEGY) final Strategy strategy) {
+			@Named(BeanConfig.SYMBOL) final String symbol,
+    		final Strategy strategy) {
 		this.restClient = restClient;
 		this.orderBook = orderBook;
 		this.strategy = strategy;
-		symbol = baseToken + "-" + quoteToken;
+		this.symbol = symbol;
 		orderBookUpdates = new ArrayList<>(50);
 		processor = u -> {
 			synchronized (orderBookUpdates) {
