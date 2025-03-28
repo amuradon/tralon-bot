@@ -12,6 +12,8 @@ import com.kucoin.sdk.rest.request.OrderCreateApiRequest.OrderCreateApiRequestBu
 import cz.amuradon.tralon.clm.OrderType;
 import cz.amuradon.tralon.clm.Side;
 import cz.amuradon.tralon.clm.connector.AccountBalance;
+import cz.amuradon.tralon.clm.connector.OrderBookResponseImpl;
+import cz.amuradon.tralon.clm.connector.OrderBookResponse;
 import cz.amuradon.tralon.clm.connector.RestClient;
 import cz.amuradon.tralon.clm.model.Order;
 import cz.amuradon.tralon.clm.model.OrderImpl;
@@ -65,6 +67,17 @@ public class KucoinRestClient implements RestClient {
 		}
 	}
 
+	@Override
+	public OrderBookResponse getOrderBook(String symbol) {
+		com.kucoin.sdk.rest.response.OrderBookResponse response;
+		try {
+			response = restClient.orderBookAPI().getAllLevel2OrderBook(symbol);
+			return new OrderBookResponseImpl(Long.parseLong(response.getSequence()), response.getAsks(), response.getBids()); 
+		} catch (IOException e) {
+			throw new IllegalStateException("Could not get order book.", e);
+		}
+	}
+	
 	public final class KucoinNewOrderBuilder implements NewOrderBuilder {
 		
 		OrderCreateApiRequestBuilder builder = OrderCreateApiRequest.builder();

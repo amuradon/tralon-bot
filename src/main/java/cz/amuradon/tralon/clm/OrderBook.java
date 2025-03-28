@@ -1,10 +1,8 @@
 package cz.amuradon.tralon.clm;
 
 import java.math.BigDecimal;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentSkipListMap;
 
 import jakarta.enterprise.context.ApplicationScoped;
 
@@ -13,16 +11,12 @@ public class OrderBook {
 	
 	private long sequence;
 	
-	private final Map<BigDecimal, BigDecimal> asks;
-	private final Map<BigDecimal, BigDecimal> bids;
+	private Map<BigDecimal, BigDecimal> asks;
+	private Map<BigDecimal, BigDecimal> bids;
 	private final Map<Side, Map<BigDecimal, BigDecimal>> sides;
 	
 	public OrderBook() {
-		this.asks = new ConcurrentSkipListMap<>(Comparator.naturalOrder());
-		this.bids = new ConcurrentSkipListMap<>(Comparator.reverseOrder());
 		this.sides = new HashMap<>();
-		sides.put(Side.SELL, asks);
-		sides.put(Side.BUY, bids);
 	}
 	
 	public long sequence() {
@@ -45,6 +39,16 @@ public class OrderBook {
 		return sides.get(side);
 	}
 	
+	public void setAsks(Map<BigDecimal, BigDecimal> asks) {
+		this.asks = asks;
+		sides.put(Side.SELL, asks);
+	}
+	
+	public void setBids(Map<BigDecimal, BigDecimal> bids) {
+		this.bids = bids;
+		sides.put(Side.BUY, bids);
+	}
+
 	@Override
 	public String toString() {
 		StringBuilder builder = new StringBuilder("Sequence: ").append(sequence).append("\nAsks:\n");
@@ -54,4 +58,5 @@ public class OrderBook {
 		
 		return builder.toString();
 	}
+
 }

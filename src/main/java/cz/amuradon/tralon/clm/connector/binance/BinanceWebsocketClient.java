@@ -27,6 +27,8 @@ public class BinanceWebsocketClient implements WebsocketClient {
 
 	private final SpotClient spotClient;
 	
+	private final WebSocketStreamClient client;
+	
 	private final ObjectMapper mapper;
 	
 	private Consumer<AccountBalance> accountBalanceCallback;
@@ -39,7 +41,7 @@ public class BinanceWebsocketClient implements WebsocketClient {
 		accountBalanceCallback = e -> {};
 		orderChangeCallback = e -> {};
 		orderBookChangeCallback = e -> {};
-		WebSocketStreamClient client = new WebSocketStreamClientImpl();
+		client = new WebSocketStreamClientImpl();
 		
 		String listenKey;
 		try {
@@ -78,8 +80,13 @@ public class BinanceWebsocketClient implements WebsocketClient {
 
 	@Override
 	public void onLevel2Data(Consumer<OrderBookChange> callback, String symbol) {
-		// TODO Auto-generated method stub
-
+		client.diffDepthStream(symbol, 100, data -> {
+			try {
+				callback.accept(mapper.readValue(data, BinanceOrderBookChange.class));
+			} catch (JsonProcessingException e) {
+				throw new IllegalStateException("Could not parse Websocket JSON", e);
+			}
+		});
 	}
 
 	@Override

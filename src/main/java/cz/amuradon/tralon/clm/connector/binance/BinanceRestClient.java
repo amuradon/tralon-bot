@@ -16,6 +16,8 @@ import com.google.common.collect.ImmutableMap;
 import cz.amuradon.tralon.clm.OrderType;
 import cz.amuradon.tralon.clm.Side;
 import cz.amuradon.tralon.clm.connector.AccountBalance;
+import cz.amuradon.tralon.clm.connector.OrderBookResponse;
+import cz.amuradon.tralon.clm.connector.OrderBookResponseImpl;
 import cz.amuradon.tralon.clm.connector.RestClient;
 import cz.amuradon.tralon.clm.model.Order;
 import io.quarkus.arc.profile.IfBuildProfile;
@@ -65,6 +67,19 @@ public class BinanceRestClient implements RestClient {
 			return mapper.readValue(response, BinanceAccountInformation.class).balances();
 		} catch (JsonProcessingException e) {
 			throw new IllegalStateException("Could not read account information.", e);
+		}
+	}
+	
+	@Override
+	public OrderBookResponse getOrderBook(String symbol) {
+		try {
+			String response = spotClient.createMarket().depth(
+					ImmutableMap.<String, Object>of("symbol", symbol, "limit", 5000));
+			BinanceOrderBookResponse orderBookResponse = mapper.readValue(response, BinanceOrderBookResponse.class);
+			return new OrderBookResponseImpl(orderBookResponse.sequence(),
+					orderBookResponse.asks(), orderBookResponse.bids());
+		} catch (JsonProcessingException e) {
+			throw new IllegalStateException("Could not read order book.", e);
 		}
 	}
 

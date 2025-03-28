@@ -1,7 +1,9 @@
 package cz.amuradon.tralon.clm.connector.binance;
 
 import java.math.BigDecimal;
+import java.util.List;
 
+import cz.amuradon.tralon.clm.OrderBook;
 import cz.amuradon.tralon.clm.Side;
 import cz.amuradon.tralon.clm.connector.OrderBookUpdate;
 
@@ -10,28 +12,47 @@ import cz.amuradon.tralon.clm.connector.OrderBookUpdate;
  */
 public class BinanceOrderBookUpdate implements OrderBookUpdate {
 
+	private final long lastUpdateId;
+	private final BigDecimal price;
+	private final BigDecimal size;
+	private final Side side;
+	
+	public BinanceOrderBookUpdate(List<String> data, Side side, long lastUpdateId) {
+		this.lastUpdateId = lastUpdateId;
+		price = new BigDecimal(data.get(0));
+		size = new BigDecimal(data.get(1));
+		this.side = side;
+	}
+
 	@Override
 	public long sequence() {
-		// TODO Auto-generated method stub
-		return 0;
+		return lastUpdateId;
 	}
 
 	@Override
 	public BigDecimal price() {
-		// TODO Auto-generated method stub
-		return null;
+		return price;
 	}
 
 	@Override
 	public BigDecimal size() {
-		// TODO Auto-generated method stub
-		return null;
+		return size;
 	}
 
 	@Override
 	public Side side() {
-		// TODO Auto-generated method stub
-		return null;
+		return side;
+	}
+
+	@Override
+	public boolean setSequenceIfShouldBeProcessed(OrderBook orderBook) {
+		// Process updates with the same last update ID
+		if (lastUpdateId >= orderBook.sequence()) {
+			orderBook.setSequence(lastUpdateId);
+			return true;
+		} else {
+			return false;
+		}
 	}
 
 }

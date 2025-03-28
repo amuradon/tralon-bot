@@ -3,6 +3,7 @@ package cz.amuradon.tralon.clm.connector.kucoin;
 import java.math.BigDecimal;
 import java.util.List;
 
+import cz.amuradon.tralon.clm.OrderBook;
 import cz.amuradon.tralon.clm.Side;
 import cz.amuradon.tralon.clm.connector.OrderBookUpdate;
 
@@ -40,5 +41,14 @@ public class KucoinOrderBookUpdate implements OrderBookUpdate {
 		return side;
 	}
 
+	@Override
+	public boolean setSequenceIfShouldBeProcessed(OrderBook orderBook) {
+		if (sequence > orderBook.sequence()) {
+			orderBook.setSequence(sequence);
+			return true;
+		} else {
+			return false;
+		}
+	}
 
 }

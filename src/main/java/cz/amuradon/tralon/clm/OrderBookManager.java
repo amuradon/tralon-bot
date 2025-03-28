@@ -1,6 +1,5 @@
 package cz.amuradon.tralon.clm;
 
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -9,10 +8,9 @@ import java.util.function.Consumer;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-import com.kucoin.sdk.KucoinRestClient;
-import com.kucoin.sdk.rest.response.OrderBookResponse;
-
+import cz.amuradon.tralon.clm.connector.OrderBookResponse;
 import cz.amuradon.tralon.clm.connector.OrderBookUpdate;
+import cz.amuradon.tralon.clm.connector.RestClient;
 import cz.amuradon.tralon.clm.strategies.Strategy;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.annotations.RegisterForReflection;
@@ -27,7 +25,7 @@ public class OrderBookManager {
 
 	public static final String BEAN_NAME = "orderBookManager";
 	
-	private final KucoinRestClient restClient;
+	private final RestClient restClient;
 	
 	private final OrderBook orderBook;
 	
@@ -41,7 +39,7 @@ public class OrderBookManager {
     
 	
 	@Inject
-	public OrderBookManager(final KucoinRestClient restClient,
+	public OrderBookManager(final RestClient restClient,
 			final OrderBook orderBook,
     		@ConfigProperty(name = "baseToken") String baseToken,
     		@ConfigProperty(name = "quoteToken") String quoteToken,
@@ -64,56 +62,41 @@ public class OrderBookManager {
 	
 	private void updateOrderBook(OrderBookUpdate update) {
 		Log.tracef("Order book update: %s", update);
-		final long sequence = update.sequence();
 		
-		if (sequence <= orderBook.sequence()) {
-			return;
-		}
-		
-		orderBook.setSequence(sequence);
-		Map<BigDecimal, BigDecimal> orderBookSide = orderBook.getOrderBookSide(update.side());
-		
-		if (update.size().compareTo(BigDecimal.ZERO) == 0) {
-			orderBookSide.remove(update.price());
-		} else {
-			orderBookSide.put(update.price(), update.size());
+		if (update.setSequenceIfShouldBeProcessed(orderBook)) {
+			Map<BigDecimal, BigDecimal> orderBookSide = orderBook.getOrderBookSide(update.side());
+			
+			if (update.size().compareTo(BigDecimal.ZERO) == 0) {
+				orderBookSide.remove(update.price());
+			} else {
+				orderBookSide.put(update.price(), update.size());
+			}
 		}
 	}
 	
 	public void createLocalOrderBook() {
-		try {
-	    	OrderBookResponse orderBookResponse = restClient.orderBookAPI().getAllLevel2OrderBook(symbol);
-	    	Log.infof("Order Book response: seq %s\nAsks:\n%s\nBids:\n%s", orderBookResponse.getSequence(),
-	    			orderBookResponse.getAsks(), orderBookResponse.getBids());
-	    	orderBook.setSequence(Long.parseLong(orderBookResponse.getSequence()));
-				setOrderBookSide(orderBookResponse.getAsks(), orderBook.getAsks());
-	    	setOrderBookSide(orderBookResponse.getBids(), orderBook.getBids());
-	    	
-	    	Log.debugf("Order book created: %s", orderBook);
-	    	
-	    	
-	    	synchronized (orderBookUpdates) {
-	    		processor = u -> {
-	    			updateOrderBook(u);
-	    			// located here to avoid calling strategy when building local order book
-	    			strategy.onOrderBookUpdate(u, orderBook.getOrderBookSide(u.side()));
-	    		};
-				for (OrderBookUpdate orderBookUpdate : orderBookUpdates) {
-					updateOrderBook(orderBookUpdate);
-				}
-				orderBookUpdates.clear();
-				strategy.computeInitialPrices(orderBook);
+    	OrderBookResponse orderBookResponse = restClient.getOrderBook(symbol);
+    	Log.infof("Order Book response: seq %s\nAsks:\n%s\nBids:\n%s", orderBookResponse.sequence(),
+    			orderBookResponse.asks(), orderBookResponse.bids());
+    	orderBook.setSequence(orderBookResponse.sequence());
+		orderBook.setAsks(orderBookResponse.asks());
+    	orderBook.setBids(orderBookResponse.bids());
+    	
+    	Log.debugf("Order book created: %s", orderBook);
+    	
+    	synchronized (orderBookUpdates) {
+    		processor = u -> {
+    			updateOrderBook(u);
+    			// located here to avoid calling strategy when building local order book
+    			strategy.onOrderBookUpdate(u, orderBook.getOrderBookSide(u.side()));
+    		};
+			for (OrderBookUpdate orderBookUpdate : orderBookUpdates) {
+				updateOrderBook(orderBookUpdate);
 			}
-	    	
-		} catch (IOException e) {
-			throw new IllegalStateException("Could not create local order book.", e);
+			orderBookUpdates.clear();
+			strategy.computeInitialPrices(orderBook);
 		}
+	    	
 	}
 	
-	private void setOrderBookSide(List<List<String>> list, final Map<BigDecimal, BigDecimal> map) {
-    	for (List<String> element : list) {
-			map.put(new BigDecimal(element.get(0)), new BigDecimal(element.get(1)));
-		}
-    }
-
 }

@@ -18,6 +18,8 @@ public interface RestClient {
 	
 	List<? extends AccountBalance> listBalances();
 			
+	OrderBookResponse getOrderBook(String symbol);
+
 	interface NewOrderBuilder {
 		NewOrderBuilder clientOrderId(String clientOrderId);
 		NewOrderBuilder side(Side side);
@@ -27,4 +29,5 @@ public interface RestClient {
 		NewOrderBuilder type(OrderType type);
 		String send();
 	}
+
 }
