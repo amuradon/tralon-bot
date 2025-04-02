@@ -16,7 +16,7 @@ public interface RestClient {
 	
 	List<? extends AccountBalance> listBalances();
 			
-	OrderBookResponse getOrderBook(String symbol);
+	OrderBookResponse orderBook(String symbol);
 
 	void cacheSymbolDetails(String symbol);
 	

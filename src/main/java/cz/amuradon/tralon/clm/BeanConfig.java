@@ -38,8 +38,8 @@ public class BeanConfig {
     }
     
     // XXX Pravdepodobne ne tak ciste reseni, asi bych mel delegovat do vlastniho vlakna?
-    @Startup
-    public void start() {
-    	new Thread(strategyFactory.create(), "Startup").start();
-    }
+//    @Startup
+//    public void start() {
+//    	new Thread(strategyFactory.create(), "Startup").start();
+//    }
 }

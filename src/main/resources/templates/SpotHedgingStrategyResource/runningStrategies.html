@@ -1,0 +1,22 @@
+{@java.util.Map<UUID, String> runningStrategies}
+
+<table>
+  <thead>
+  <tr>
+    <th>UUID</th>
+    <th>Info</th>
+    <th>Actions</th>
+  </tr>
+  </thead>
+  {#for item in runningStrategies}
+    <tr>
+	    <td>{item.key}</td>
+	    <td>{item.value}</td>
+	    <td>
+	    	<button hx-target="#runningStrategies" hx-post="/spot-hedging-strategy/stop" name="stopUuid" value="{item.key}">
+	    		STOP
+	   		</button>
+	 	</td>
+    </tr>
+  {/for}
+</table>

@@ -74,7 +74,7 @@ public class OrderBookManager {
 	}
 	
 	public void createLocalOrderBook() {
-    	OrderBookResponse orderBookResponse = restClient.getOrderBook(symbol);
+    	OrderBookResponse orderBookResponse = restClient.orderBook(symbol);
     	Log.infof("Order Book response: seq %s\nAsks:\n%s\nBids:\n%s", orderBookResponse.sequence(),
     			orderBookResponse.asks(), orderBookResponse.bids());
     	orderBook.setSequence(orderBookResponse.sequence());

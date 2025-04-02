@@ -68,7 +68,7 @@ public class KucoinRestClient implements RestClient {
 	}
 
 	@Override
-	public OrderBookResponse getOrderBook(String symbol) {
+	public OrderBookResponse orderBook(String symbol) {
 		com.kucoin.sdk.rest.response.OrderBookResponse response;
 		try {
 			response = restClient.orderBookAPI().getAllLevel2OrderBook(symbol);
