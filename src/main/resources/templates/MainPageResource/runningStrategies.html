@@ -13,7 +13,7 @@
 	    <td>{item.key}</td>
 	    <td>{item.value}</td>
 	    <td>
-	    	<button hx-target="#runningStrategies" hx-post="/spot-hedging-strategy/stop" name="stopUuid" value="{item.key}">
+	    	<button hx-target="#runningStrategies" hx-post="/stop-strategy" name="stopUuid" value="{item.key}">
 	    		STOP
 	   		</button>
 	 	</td>

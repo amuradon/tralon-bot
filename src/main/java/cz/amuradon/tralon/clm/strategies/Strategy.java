@@ -7,6 +7,8 @@ import cz.amuradon.tralon.clm.OrderBook;
 import cz.amuradon.tralon.clm.connector.OrderBookUpdate;
 
 public interface Strategy {
+	
+	void start();
 
 	void onOrderBookUpdate(OrderBookUpdate update, Map<BigDecimal, BigDecimal> orderBookSide);
 	
@@ -15,4 +17,6 @@ public interface Strategy {
 	void onBaseBalanceUpdate(BigDecimal balance);
 	
 	void onQuoteBalanceUpdate(BigDecimal balance);
+
+	void stop();
 }

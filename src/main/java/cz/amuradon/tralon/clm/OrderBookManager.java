@@ -14,38 +14,35 @@ import cz.amuradon.tralon.clm.connector.RestClient;
 import cz.amuradon.tralon.clm.strategies.Strategy;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.annotations.RegisterForReflection;
+import io.vertx.core.eventbus.EventBus;
+import io.vertx.core.eventbus.MessageProducer;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 
-@ApplicationScoped
-@Named(OrderBookManager.BEAN_NAME)
-@RegisterForReflection
+// FIXME fix it
+//@ApplicationScoped
 public class OrderBookManager {
 
-	public static final String BEAN_NAME = "orderBookManager";
-	
 	private final RestClient restClient;
 	
 	private final OrderBook orderBook;
 	
     private final String symbol;
     
-    private final Strategy strategy; 
-    
     private Consumer<OrderBookUpdate> processor;
     
     private List<OrderBookUpdate> orderBookUpdates;
     
 	
-	@Inject
+//	@Inject
 	public OrderBookManager(final RestClient restClient,
 			final OrderBook orderBook,
 			@Named(BeanConfig.SYMBOL) final String symbol,
-    		final Strategy strategy) {
+    		final EventBus eventBus) {
 		this.restClient = restClient;
 		this.orderBook = orderBook;
-		this.strategy = strategy;
+		// XXX needs to be per symbol and exchange
 		this.symbol = symbol;
 		orderBookUpdates = new ArrayList<>(50);
 		processor = u -> {
@@ -83,18 +80,18 @@ public class OrderBookManager {
     	
     	Log.debugf("Order book created: %s", orderBook);
     	
-    	synchronized (orderBookUpdates) {
-    		processor = u -> {
-    			updateOrderBook(u);
-    			// located here to avoid calling strategy when building local order book
-    			strategy.onOrderBookUpdate(u, orderBook.getOrderBookSide(u.side()));
-    		};
-			for (OrderBookUpdate orderBookUpdate : orderBookUpdates) {
-				updateOrderBook(orderBookUpdate);
-			}
-			orderBookUpdates.clear();
-			strategy.computeInitialPrices(orderBook);
-		}
+//    	synchronized (orderBookUpdates) {
+//    		processor = u -> {
+//    			updateOrderBook(u);
+//    			// located here to avoid calling strategy when building local order book
+//    			strategy.onOrderBookUpdate(u, orderBook.getOrderBookSide(u.side()));
+//    		};
+//			for (OrderBookUpdate orderBookUpdate : orderBookUpdates) {
+//				updateOrderBook(orderBookUpdate);
+//			}
+//			orderBookUpdates.clear();
+//			strategy.computeInitialPrices(orderBook);
+//		}
 	    	
 	}
 	

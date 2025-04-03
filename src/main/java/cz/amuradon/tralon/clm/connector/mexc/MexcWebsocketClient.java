@@ -2,9 +2,14 @@ package cz.amuradon.tralon.clm.connector.mexc;
 
 import java.io.IOException;
 import java.net.URI;
+import java.util.function.Consumer;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
+import cz.amuradon.tralon.clm.connector.AccountBalance;
+import cz.amuradon.tralon.clm.connector.OrderBookChange;
+import cz.amuradon.tralon.clm.connector.OrderChange;
+import cz.amuradon.tralon.clm.connector.WebsocketClient;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.websocket.ClientEndpoint;
@@ -16,7 +21,8 @@ import jakarta.websocket.Session;
 
 @ClientEndpoint
 @ApplicationScoped
-public class MexcWsClient {
+@Mexc
+public class MexcWebsocketClient implements WebsocketClient {
 	
 	public static final String SPOT_TRADE_UPDATES_CHANNEL_PREFIX = "spot@public.deals.v3.api@";
 
@@ -35,7 +41,7 @@ public class MexcWsClient {
 	private String depthUpdatesChannel;
 	
 	@Inject
-	public MexcWsClient(@ConfigProperty(name = "mexc-api.websocket.url") final String baseUri,
+	public MexcWebsocketClient(@ConfigProperty(name = "mexc-api.websocket.url") final String baseUri,
 			final MexcWebsocketListener websocketListener) {
 		this.baseUri = baseUri;
 		this.websocketListener = websocketListener;
@@ -68,6 +74,24 @@ public class MexcWsClient {
 	@OnMessage
 	public void onMessage(String message) {
 		websocketListener.onMessage(message);
+	}
+
+	@Override
+	public void onOrderChange(Consumer<OrderChange> callback) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public void onLevel2Data(Consumer<OrderBookChange> callback, String symbol) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public void onAccountBalance(Consumer<AccountBalance> callback) {
+		// TODO Auto-generated method stub
+		
 	}
 
 }

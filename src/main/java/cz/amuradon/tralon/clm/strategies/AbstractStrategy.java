@@ -13,11 +13,17 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import cz.amuradon.tralon.clm.OrderBook;
+import cz.amuradon.tralon.clm.OrderBookManager;
+import cz.amuradon.tralon.clm.OrderStatus;
 import cz.amuradon.tralon.clm.OrderType;
 import cz.amuradon.tralon.clm.PriceProposal;
 import cz.amuradon.tralon.clm.Side;
+import cz.amuradon.tralon.clm.connector.AccountBalance;
+import cz.amuradon.tralon.clm.connector.OrderBookChange;
 import cz.amuradon.tralon.clm.connector.OrderBookUpdate;
+import cz.amuradon.tralon.clm.connector.OrderChange;
 import cz.amuradon.tralon.clm.connector.RestClient;
+import cz.amuradon.tralon.clm.connector.WebsocketClient;
 import cz.amuradon.tralon.clm.model.Order;
 import cz.amuradon.tralon.clm.model.OrderImpl;
 import io.quarkus.logging.Log;
@@ -39,6 +45,14 @@ public abstract class AbstractStrategy implements Strategy {
 	private final ScheduledExecutorService scheduler;
 
 	private final Map<Side, ScheduledFuture<?>> cancelOrdersTasks;
+	
+    private final WebsocketClient websocketClient;
+    
+	private final String baseToken;
+	
+	private final String quoteToken;
+	
+    private final OrderBookManager orderBookManager;
     
     public AbstractStrategy(
     		final int priceChangeDelayMs,
@@ -47,7 +61,11 @@ public abstract class AbstractStrategy implements Strategy {
     		final String symbol,
     		final int maxBalanceToUse,
     		final Map<String, Order> orders,
-    		final ScheduledExecutorService scheduler) {
+    		final ScheduledExecutorService scheduler,
+    		final WebsocketClient websocketClient,
+    		final String baseToken,
+    		final String quoteToken,
+    		final OrderBookManager orderBookManager) {
 		this.restClient = restClient;
 		this.symbol = symbol;
 		this.orders = orders;
@@ -56,7 +74,84 @@ public abstract class AbstractStrategy implements Strategy {
 		this.maxBalanceToUse = new BigDecimal(maxBalanceToUse);
 		this.scheduler = scheduler;
 		cancelOrdersTasks = new HashMap<>();
+		this.websocketClient = websocketClient;
+		this.baseToken = baseToken;
+		this.quoteToken = quoteToken;
+		this.orderBookManager = orderBookManager;
 	}
+    
+    @Override
+    public void start() {
+    	restClient.cacheSymbolDetails(symbol);
+    	
+    	// Start consuming data from websockets
+    	websocketClient.onOrderChange(this::onOrderChange);
+    	websocketClient.onLevel2Data(this::onL2RT, symbol);
+
+    	// Create local order book
+    	orderBookManager.createLocalOrderBook();
+    	
+    	// Get existing orders
+    	orders.clear();
+    	orders.putAll(restClient.listOrders(symbol));
+    	Log.infof("Current orders %s", orders);
+    	
+    	// Get existing balances
+    	for (AccountBalance balance : restClient.listBalances()) {
+			onAccountBalance(balance);
+    	}
+
+    	// Start balance websocket after initial call
+    	websocketClient.onAccountBalance(this::onAccountBalance);
+    	
+    }
+    
+    @Override
+    public void stop() {
+    	// TODO Auto-generated method stub
+    }
+    
+    private void onL2RT(OrderBookChange event) {
+    	// FIXME async processing? No queue for unprocessed data 
+    	event.getAsks().stream().forEach(u -> orderBookManager.processUpdate(u));
+    	event.getBids().stream().forEach(u -> orderBookManager.processUpdate(u));
+    }
+    
+    private void onOrderChange(OrderChange data) {
+		OrderStatus orderStatus = data.status();
+		if (symbol.equalsIgnoreCase(data.symbol())) {
+			// Open order are added and cancelled are removed immediately when request sent over REST API
+			// but this is to sync server state as well as record any manual intervention
+			
+    		if (orderStatus == OrderStatus.NEW) {
+    			orders.put(data.orderId(), 
+    					new OrderImpl(data.orderId(), data.symbol(),
+    							Side.getValue(data.side()), data.size(), data.price()));
+    		} else if (orderStatus == OrderStatus.FILLED) {
+    			orders.remove(data.orderId());
+    		} else if (orderStatus == OrderStatus.CANCELED) {
+    			// The orders are removed immediately once cancelled, this is to cover manual cancel
+    			orders.remove(data.orderId());
+    		} else if (orderStatus == OrderStatus.PARTIALLY_FILLED) {
+    			orders.get(data.orderId()).size(data.remainSize());
+    		}
+    	}
+		Log.infof("Order change: %s, ID: %s", data.orderId(), orderStatus);
+		Log.infof("Orders in memory %s", orders);
+    }
+    
+    private void onAccountBalance(AccountBalance accountBalance) {
+    	String token = accountBalance.asset();
+    	BigDecimal available = accountBalance.available();
+		if (baseToken.equalsIgnoreCase(token)) {
+    		Log.infof("Base balance changed %s: %s", baseToken, available);
+    		// XXX is the split needed since Side is not passed as arg anymore
+    		onBaseBalanceUpdate(available);
+    	} else if (quoteToken.equalsIgnoreCase(accountBalance.asset())) {
+    		Log.infof("Quote balance changed %s: %s", quoteToken, available);
+    		onQuoteBalanceUpdate(available);
+    	}
+    }
 	
     @Override
 	public void onOrderBookUpdate(OrderBookUpdate update, Map<BigDecimal, BigDecimal> orderBookSide) {

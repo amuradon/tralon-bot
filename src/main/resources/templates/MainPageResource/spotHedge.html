@@ -1,16 +1,7 @@
 {@java.lang.String[] exchanges}
 
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>Spot Hedging Strategy</title>
-  <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css">
-  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
-</head>
-<body>
 <h3>Spot Hedging Strategy</h3>
-<form hx-target="#runningStrategies" hx-post="/spot-hedging-strategy/run">
+<form hx-target="#runningStrategies" hx-post="/run-spot-hedge">
 	<label for="exchangeName">Exchange Name:</label>
 	<select name="exchangeName">
 	  {#for name in exchanges}
@@ -35,9 +26,3 @@
 	
 	<input type="submit" value="Run" />
 </form>
-<h4>Running strategies</h4>
-<div id="runningStrategies" hx-get="/spot-hedging-strategy/get" hx-trigger="load">
-<!-- To be replaced by the result of calling /get -->
-</div>
-</body>
-</html>

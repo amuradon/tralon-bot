@@ -5,6 +5,8 @@ import java.math.BigDecimal;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import cz.amuradon.tralon.clm.Side;
+
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record OrderUpdateData(
 		@JsonProperty("i") String orderId,
