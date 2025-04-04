@@ -28,12 +28,6 @@ public class SpotHedgingStrategy implements Strategy {
 	}
 
 	@Override
-	public void computeInitialPrices(OrderBook orderBook) {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
 	public void onBaseBalanceUpdate(BigDecimal balance) {
 		// TODO Auto-generated method stub
 

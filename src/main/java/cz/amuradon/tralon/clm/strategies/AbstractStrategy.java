@@ -53,6 +53,8 @@ public abstract class AbstractStrategy implements Strategy {
 	private final String quoteToken;
 	
     private final OrderBookManager orderBookManager;
+
+	private boolean localOrderBookCreated;
     
     public AbstractStrategy(
     		final int priceChangeDelayMs,
@@ -86,10 +88,13 @@ public abstract class AbstractStrategy implements Strategy {
     	
     	// Start consuming data from websockets
     	websocketClient.onOrderChange(this::onOrderChange);
-    	websocketClient.onLevel2Data(this::onL2RT, symbol);
+    	websocketClient.onOrderBookChange(this::onOrderBookChange, symbol);
 
     	// Create local order book
-    	orderBookManager.createLocalOrderBook();
+    	// XXX promyslet synchronizaci celkove
+    	OrderBook orderBook = orderBookManager.createLocalOrderBook(symbol);
+    	localOrderBookCreated = true;
+    	computeInitialPrices(orderBook);
     	
     	// Get existing orders
     	orders.clear();
@@ -111,10 +116,16 @@ public abstract class AbstractStrategy implements Strategy {
     	// TODO Auto-generated method stub
     }
     
-    private void onL2RT(OrderBookChange event) {
+    private void onOrderBookChange(OrderBookChange event) {
     	// FIXME async processing? No queue for unprocessed data 
-    	event.getAsks().stream().forEach(u -> orderBookManager.processUpdate(u));
-    	event.getBids().stream().forEach(u -> orderBookManager.processUpdate(u));
+    	event.getAsks().stream().forEach(u ->  {
+    		OrderBook ob = orderBookManager.processUpdate(u);
+    		onOrderBookUpdate(u, ob.getOrderBookSide(u.side()));
+    	});
+    	event.getBids().stream().forEach(u -> {
+    		OrderBook ob = orderBookManager.processUpdate(u);
+    		onOrderBookUpdate(u, ob.getOrderBookSide(u.side()));
+    	});
     }
     
     private void onOrderChange(OrderChange data) {
@@ -160,7 +171,8 @@ public abstract class AbstractStrategy implements Strategy {
 		// TODO timestamp z update -> nezpracovat starsi update?
 		// Serves as monitor for all things on the same side
 		synchronized (proposal) {
-			if (!side.isPriceOutOfRange(update.price(), proposal.currentPrice)) {
+			if (!side.isPriceOutOfRange(update.price(), proposal.currentPrice)
+					&& localOrderBookCreated) {
 				
 				BigDecimal targetPrice = getTargetPriceLevel(orderBookSide);
 				
@@ -189,8 +201,7 @@ public abstract class AbstractStrategy implements Strategy {
 	
 	abstract BigDecimal getTargetPriceLevel(Map<BigDecimal, BigDecimal> aggregatedOrders);
 
-	@Override
-	public void computeInitialPrices(OrderBook orderBook) {
+	private void computeInitialPrices(OrderBook orderBook) {
 		long timestamp = new Date().getTime();
     	BigDecimal askPrice = getTargetPriceLevel(orderBook.getAsks());
     	PriceProposal askProposal = priceProposals.get(Side.SELL);

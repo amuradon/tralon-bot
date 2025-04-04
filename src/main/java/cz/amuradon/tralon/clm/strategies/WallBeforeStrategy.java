@@ -19,6 +19,7 @@ import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 
+// TODO create on-demand
 // @Singleton required due to abstract parent class
 //@Singleton
 public class WallBeforeStrategy extends AbstractStrategy {
@@ -31,7 +32,7 @@ public class WallBeforeStrategy extends AbstractStrategy {
     		@ConfigProperty(name = "priceChangeDelayMs") final int priceChangeDelayMs,
     		final Map<Side, PriceProposal> priceProposals,
     		final RestClient restClient,
-    		@Named(BeanConfig.SYMBOL) final String symbol,
+    		final String symbol,
     		@ConfigProperty(name = "maxQuoteBalanceToUse") final int maxBalanceToUse,
     		final Map<String, Order> orders,
     		final ScheduledExecutorService scheduler,

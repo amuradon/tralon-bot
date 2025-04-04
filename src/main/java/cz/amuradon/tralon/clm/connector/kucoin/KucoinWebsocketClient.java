@@ -35,7 +35,7 @@ public class KucoinWebsocketClient implements WebsocketClient {
 	}
 
 	@Override
-	public void onLevel2Data(Consumer<OrderBookChange> callback, String symbol) {
+	public void onOrderBookChange(Consumer<OrderBookChange> callback, String symbol) {
 		wsClientPublic.onLevel2Data(e -> callback.accept(new KucoinOrderBookChange(e.getData())), symbol);
 	}
 

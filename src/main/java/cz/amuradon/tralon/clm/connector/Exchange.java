@@ -9,12 +9,7 @@ import cz.amuradon.tralon.clm.connector.mexc.Mexc;
 public enum Exchange {
 
 	BINANCE("Binance", Binance.LITERAL),
-	KUCOIN("Kucoin", Kucoin.LITERAL) {
-		@Override
-		public String symbol(String baseAsset, String quoteAsset) {
-			return baseAsset + "-" + quoteAsset;
-		}
-	},
+	KUCOIN("Kucoin", Kucoin.LITERAL),
 	MEXC("MEXC", Mexc.LITERAL);
 	
 	private final String displayName;
@@ -31,10 +26,6 @@ public enum Exchange {
 
 	public Annotation qualifier() {
 		return qualifier;
-	}
-	
-	public String symbol(final String baseAsset, final String quoteAsset) {
-		return baseAsset + quoteAsset;
 	}
 	
 	public static Exchange fromDisplayName(String displayName) {

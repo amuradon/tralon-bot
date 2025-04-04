@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -17,33 +18,24 @@ import io.quarkus.runtime.annotations.RegisterForReflection;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.eventbus.MessageProducer;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.context.Dependent;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 
-// FIXME fix it
-//@ApplicationScoped
 public class OrderBookManager {
 
 	private final RestClient restClient;
 	
 	private final OrderBook orderBook;
 	
-    private final String symbol;
-    
     private Consumer<OrderBookUpdate> processor;
     
     private List<OrderBookUpdate> orderBookUpdates;
     
-	
-//	@Inject
 	public OrderBookManager(final RestClient restClient,
-			final OrderBook orderBook,
-			@Named(BeanConfig.SYMBOL) final String symbol,
-    		final EventBus eventBus) {
+			final OrderBook orderBook) {
 		this.restClient = restClient;
 		this.orderBook = orderBook;
-		// XXX needs to be per symbol and exchange
-		this.symbol = symbol;
 		orderBookUpdates = new ArrayList<>(50);
 		processor = u -> {
 			synchronized (orderBookUpdates) {
@@ -52,8 +44,9 @@ public class OrderBookManager {
 		};
     }
 	
-	public void processUpdate(OrderBookUpdate update) {
+	public OrderBook processUpdate(OrderBookUpdate update) {
 		processor.accept(update);
+		return orderBook;
 	}
 	
 	private void updateOrderBook(OrderBookUpdate update) {
@@ -70,7 +63,7 @@ public class OrderBookManager {
 		}
 	}
 	
-	public void createLocalOrderBook() {
+	public OrderBook createLocalOrderBook(String symbol) {
     	OrderBookResponse orderBookResponse = restClient.orderBook(symbol);
     	Log.infof("Order Book response: seq %s\nAsks:\n%s\nBids:\n%s", orderBookResponse.sequence(),
     			orderBookResponse.asks(), orderBookResponse.bids());
@@ -80,18 +73,16 @@ public class OrderBookManager {
     	
     	Log.debugf("Order book created: %s", orderBook);
     	
-//    	synchronized (orderBookUpdates) {
-//    		processor = u -> {
-//    			updateOrderBook(u);
-//    			// located here to avoid calling strategy when building local order book
-//    			strategy.onOrderBookUpdate(u, orderBook.getOrderBookSide(u.side()));
-//    		};
-//			for (OrderBookUpdate orderBookUpdate : orderBookUpdates) {
-//				updateOrderBook(orderBookUpdate);
-//			}
-//			orderBookUpdates.clear();
-//			strategy.computeInitialPrices(orderBook);
-//		}
+    	synchronized (orderBookUpdates) {
+    		processor = u -> {
+    			updateOrderBook(u);
+    		};
+			for (OrderBookUpdate orderBookUpdate : orderBookUpdates) {
+				updateOrderBook(orderBookUpdate);
+			}
+			orderBookUpdates.clear();
+		}
+    	return orderBook;
 	    	
 	}
 	

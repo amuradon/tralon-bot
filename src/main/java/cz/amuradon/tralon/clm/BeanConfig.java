@@ -11,8 +11,6 @@ import jakarta.enterprise.inject.Produces;
 @ApplicationScoped
 public class BeanConfig {
 
-	public static final String SYMBOL = "symbol";
-	
     @ApplicationScoped
     @Produces
     public Map<String, Order> orders() {

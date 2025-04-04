@@ -12,8 +12,6 @@ public interface Strategy {
 
 	void onOrderBookUpdate(OrderBookUpdate update, Map<BigDecimal, BigDecimal> orderBookSide);
 	
-	void computeInitialPrices(OrderBook orderBook);
-	
 	void onBaseBalanceUpdate(BigDecimal balance);
 	
 	void onQuoteBalanceUpdate(BigDecimal balance);

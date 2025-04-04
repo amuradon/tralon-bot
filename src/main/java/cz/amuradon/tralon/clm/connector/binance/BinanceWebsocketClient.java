@@ -78,7 +78,7 @@ public class BinanceWebsocketClient implements WebsocketClient {
 	}
 
 	@Override
-	public void onLevel2Data(Consumer<OrderBookChange> callback, String symbol) {
+	public void onOrderBookChange(Consumer<OrderBookChange> callback, String symbol) {
 		client.diffDepthStream(symbol, 100, data -> {
 			try {
 				callback.accept(mapper.readValue(data, BinanceOrderBookChange.class));

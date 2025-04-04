@@ -85,7 +85,7 @@ public class MexcWebsocketClient implements WebsocketClient {
 	}
 
 	@Override
-	public void onLevel2Data(Consumer<OrderBookChange> callback, String symbol) {
+	public void onOrderBookChange(Consumer<OrderBookChange> callback, String symbol) {
 		// TODO Auto-generated method stub
 		
 	}
