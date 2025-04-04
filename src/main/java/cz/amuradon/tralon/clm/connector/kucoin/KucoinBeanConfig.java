@@ -19,7 +19,6 @@ import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 
 @ApplicationScoped
-@IfBuildProfile("kucoin")
 public class KucoinBeanConfig {
 
 	private final KucoinClientBuilder kucoinClientBuilder;
@@ -56,12 +55,4 @@ public class KucoinBeanConfig {
 		}
     }
 
-    @Singleton
-    @Produces
-    @Named(BeanConfig.SYMBOL)
-    public String symbol(@ConfigProperty(name = "baseToken") String baseToken,
-    		@ConfigProperty(name = "quoteToken") String quoteToken) {
-    	return baseToken + "-" + quoteToken;
-    }
-    
 }

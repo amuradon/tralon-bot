@@ -4,9 +4,7 @@ import java.util.List;
 import java.util.function.Consumer;
 
 import com.binance.connector.client.SpotClient;
-import com.binance.connector.client.WebSocketApiClient;
 import com.binance.connector.client.WebSocketStreamClient;
-import com.binance.connector.client.impl.WebSocketApiClientImpl;
 import com.binance.connector.client.impl.WebSocketStreamClientImpl;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -17,12 +15,13 @@ import cz.amuradon.tralon.clm.connector.AccountBalance;
 import cz.amuradon.tralon.clm.connector.OrderBookChange;
 import cz.amuradon.tralon.clm.connector.OrderChange;
 import cz.amuradon.tralon.clm.connector.WebsocketClient;
-import io.quarkus.arc.profile.IfBuildProfile;
+import cz.amuradon.tralon.clm.connector.WebsocketClientFactory;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 
 @ApplicationScoped
-@IfBuildProfile("binance")
+@Binance
+@WebsocketClientFactory // Required for proper usage with Instance
 public class BinanceWebsocketClient implements WebsocketClient {
 
 	private final SpotClient spotClient;

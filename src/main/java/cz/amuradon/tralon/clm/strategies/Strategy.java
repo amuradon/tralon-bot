@@ -19,4 +19,6 @@ public interface Strategy {
 	void onQuoteBalanceUpdate(BigDecimal balance);
 
 	void stop();
+	
+	String getDescription();
 }

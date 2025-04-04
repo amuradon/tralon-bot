@@ -12,17 +12,18 @@ import com.kucoin.sdk.rest.request.OrderCreateApiRequest.OrderCreateApiRequestBu
 import cz.amuradon.tralon.clm.OrderType;
 import cz.amuradon.tralon.clm.Side;
 import cz.amuradon.tralon.clm.connector.AccountBalance;
-import cz.amuradon.tralon.clm.connector.OrderBookResponseImpl;
 import cz.amuradon.tralon.clm.connector.OrderBookResponse;
+import cz.amuradon.tralon.clm.connector.OrderBookResponseImpl;
 import cz.amuradon.tralon.clm.connector.RestClient;
+import cz.amuradon.tralon.clm.connector.RestClientFactory;
 import cz.amuradon.tralon.clm.model.Order;
 import cz.amuradon.tralon.clm.model.OrderImpl;
-import io.quarkus.arc.profile.IfBuildProfile;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 @ApplicationScoped
-@IfBuildProfile("kucoin")
+@Kucoin
+@RestClientFactory // Required for proper usage with Instance
 public class KucoinRestClient implements RestClient {
 
 	private final com.kucoin.sdk.KucoinRestClient restClient;

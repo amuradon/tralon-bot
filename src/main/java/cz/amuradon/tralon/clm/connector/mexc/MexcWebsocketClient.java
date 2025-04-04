@@ -10,6 +10,7 @@ import cz.amuradon.tralon.clm.connector.AccountBalance;
 import cz.amuradon.tralon.clm.connector.OrderBookChange;
 import cz.amuradon.tralon.clm.connector.OrderChange;
 import cz.amuradon.tralon.clm.connector.WebsocketClient;
+import cz.amuradon.tralon.clm.connector.WebsocketClientFactory;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.websocket.ClientEndpoint;
@@ -22,6 +23,7 @@ import jakarta.websocket.Session;
 @ClientEndpoint
 @ApplicationScoped
 @Mexc
+@WebsocketClientFactory // Required for proper usage with Instance
 public class MexcWebsocketClient implements WebsocketClient {
 	
 	public static final String SPOT_TRADE_UPDATES_CHANNEL_PREFIX = "spot@public.deals.v3.api@";

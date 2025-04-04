@@ -7,11 +7,8 @@ import org.eclipse.microprofile.rest.client.annotation.ClientHeaderParam;
 import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
 import org.jboss.resteasy.reactive.RestQuery;
 
-import cz.amuradon.tralon.clm.connector.Connectors;
 import cz.amuradon.tralon.clm.connector.OrderBookResponse;
-import cz.amuradon.tralon.clm.connector.RestClient;
 import io.quarkus.rest.client.reactive.ClientQueryParam;
-import jakarta.inject.Named;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;

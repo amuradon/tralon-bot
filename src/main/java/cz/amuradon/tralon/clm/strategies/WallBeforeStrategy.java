@@ -21,7 +21,6 @@ import jakarta.inject.Singleton;
 
 // @Singleton required due to abstract parent class
 //@Singleton
-//@IfBuildProfile("wallbefore")
 public class WallBeforeStrategy extends AbstractStrategy {
 
 	private final BigDecimal sideVolumeThreshold;
@@ -58,4 +57,10 @@ public class WallBeforeStrategy extends AbstractStrategy {
     	
     	return price;
     }
+
+	@Override
+	public String getDescription() {
+		// TODO complete description
+		return getClass().getSimpleName();
+	}
 }

@@ -2,7 +2,6 @@ package cz.amuradon.tralon.clm.connector.binance;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -20,13 +19,14 @@ import cz.amuradon.tralon.clm.connector.AccountBalance;
 import cz.amuradon.tralon.clm.connector.OrderBookResponse;
 import cz.amuradon.tralon.clm.connector.OrderBookResponseImpl;
 import cz.amuradon.tralon.clm.connector.RestClient;
+import cz.amuradon.tralon.clm.connector.RestClientFactory;
 import cz.amuradon.tralon.clm.model.Order;
-import io.quarkus.arc.profile.IfBuildProfile;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 @ApplicationScoped
-@IfBuildProfile("binance")
+@Binance
+@RestClientFactory // Required for proper usage with Instance
 public class BinanceRestClient implements RestClient {
 
 	private final SpotClient spotClient;

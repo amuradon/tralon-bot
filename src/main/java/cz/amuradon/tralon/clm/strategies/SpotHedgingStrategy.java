@@ -56,4 +56,10 @@ public class SpotHedgingStrategy implements Strategy {
 		// TODO Auto-generated method stub
 		return super.toString();
 	}
+
+	@Override
+	public String getDescription() {
+		// TODO complete description
+		return getClass().getSimpleName();
+	}
 }

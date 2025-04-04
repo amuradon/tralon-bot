@@ -7,24 +7,22 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.stream.Collectors;
 
 import org.jboss.resteasy.reactive.RestForm;
 
+import cz.amuradon.tralon.clm.connector.Exchange;
 import cz.amuradon.tralon.clm.connector.RestClient;
+import cz.amuradon.tralon.clm.connector.RestClientFactory;
 import cz.amuradon.tralon.clm.connector.WebsocketClient;
-import cz.amuradon.tralon.clm.connector.mexc.Mexc;
+import cz.amuradon.tralon.clm.connector.WebsocketClientFactory;
 import cz.amuradon.tralon.clm.strategies.SpotHedgingStrategy;
 import cz.amuradon.tralon.clm.strategies.Strategy;
-import io.quarkus.arc.impl.AnnotationLiterals;
 import io.quarkus.logging.Log;
 import io.quarkus.qute.CheckedTemplate;
 import io.quarkus.qute.TemplateInstance;
 import jakarta.enterprise.inject.Instance;
-import jakarta.enterprise.inject.literal.NamedLiteral;
-import jakarta.enterprise.inject.literal.QualifierLiteral;
-import jakarta.enterprise.util.AnnotationLiteral;
 import jakarta.inject.Inject;
-import jakarta.inject.Named;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
@@ -47,10 +45,10 @@ public class MainPageResource {
 	private final Instance<WebsocketClient> websocketClientFactory;
 	
 	@Inject
-	public MainPageResource(Instance<RestClient> restClientFactory,
-			Instance<WebsocketClient> websocketClientFactory) {
+	public MainPageResource(@RestClientFactory Instance<RestClient> restClientFactory,
+			@WebsocketClientFactory Instance<WebsocketClient> websocketClientFactory) {
 		runningStrategies = new ConcurrentSkipListMap<>();
-		supportedExchanges = Arrays.asList("Binance", "Kucoin", "MEXC");
+		supportedExchanges = Arrays.stream(Exchange.values()).map(Exchange::displayName).collect(Collectors.toList());
 		this.restClientFactory = restClientFactory;
 		this.websocketClientFactory = websocketClientFactory;
 	}
@@ -72,12 +70,13 @@ public class MainPageResource {
 	@Path("/stop-strategy")
 	@Produces(MediaType.TEXT_HTML)
 	public TemplateInstance stop(@RestForm String stopUuid) {
-		Log.infof("Stopping %s", stopUuid);
+		Log.infof("Stopping strategy: %s", stopUuid);
 		
 		Strategy strategy = runningStrategies.remove(UUID.fromString(stopUuid));
 		
 		strategy.stop();
 		
+		Log.infof("Stopped strategy: %s", stopUuid);
 		return Templates.runningStrategies(runningStrategies);
 	}
 	
@@ -103,11 +102,17 @@ public class MainPageResource {
 	public TemplateInstance runSpotHedge(@RestForm String exchangeName, @RestForm LocalDateTime endDateTime,
 			@RestForm String baseAsset, @RestForm String quoteAsset, @RestForm BigDecimal price,
 			@RestForm BigDecimal baseQuantity) {
-		RestClient restClient = restClientFactory.select(Mexc.MexcLiteral.INSTANCE).get();
-		WebsocketClient websocketClient = websocketClientFactory.select(Mexc.MexcLiteral.INSTANCE).get();
+		final Exchange exchange = Exchange.fromDisplayName(exchangeName);
+		final RestClient restClient =
+				restClientFactory.select(RestClientFactory.LITERAL, exchange.qualifier()).get();
+		final WebsocketClient websocketClient =
+				websocketClientFactory.select(WebsocketClientFactory.LITERAL, exchange.qualifier()).get();
 		Strategy strategy = new SpotHedgingStrategy(restClient, websocketClient, baseAsset, quoteAsset, price, baseQuantity);
 		strategy.start();
-		runningStrategies.put(UUID.randomUUID(), strategy);
+		final UUID uuid = UUID.randomUUID();
+		String strategyDescription = strategy.getDescription();
+		runningStrategies.put(uuid, strategy);
+		Log.infof("Started strategy: %s - %s", uuid, strategyDescription);
 		return Templates.runningStrategies(runningStrategies);
 	}
 

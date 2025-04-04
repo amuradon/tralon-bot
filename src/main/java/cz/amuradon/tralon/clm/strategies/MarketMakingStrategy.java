@@ -20,7 +20,6 @@ import jakarta.inject.Singleton;
 
 //@Singleton required due to abstract parent class
 //@Singleton
-//@IfBuildProfile("marketmaking")
 public class MarketMakingStrategy extends AbstractStrategy {
 
 //    @Inject
@@ -55,4 +54,9 @@ public class MarketMakingStrategy extends AbstractStrategy {
 		return aggregatedOrders.entrySet().iterator().next().getKey();
 	}
 
+	@Override
+	public String getDescription() {
+		// TODO complete description
+		return getClass().getSimpleName();
+	}
 }
