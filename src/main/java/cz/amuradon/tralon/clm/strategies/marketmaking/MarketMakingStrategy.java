@@ -1,4 +1,4 @@
-package cz.amuradon.tralon.clm.strategies;
+package cz.amuradon.tralon.clm.strategies.marketmaking;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -26,9 +26,10 @@ import cz.amuradon.tralon.clm.connector.RestClient;
 import cz.amuradon.tralon.clm.connector.WebsocketClient;
 import cz.amuradon.tralon.clm.model.Order;
 import cz.amuradon.tralon.clm.model.OrderImpl;
+import cz.amuradon.tralon.clm.strategies.Strategy;
 import io.quarkus.logging.Log;
 
-public abstract class AbstractStrategy implements Strategy {
+public class MarketMakingStrategy implements Strategy {
 
 	private final RestClient restClient;
     
@@ -48,38 +49,44 @@ public abstract class AbstractStrategy implements Strategy {
 	
     private final WebsocketClient websocketClient;
     
-	private final String baseToken;
+	private final String baseAsset;
 	
-	private final String quoteToken;
+	private final String quoteAsset;
 	
     private final OrderBookManager orderBookManager;
+    
+    private final SpreadCalculator spreadCalculator;
 
 	private boolean localOrderBookCreated;
-    
-    public AbstractStrategy(
+	
+    public MarketMakingStrategy(
     		final int priceChangeDelayMs,
-    		final Map<Side, PriceProposal> priceProposals,
     		final RestClient restClient,
     		final String symbol,
     		final int maxBalanceToUse,
     		final Map<String, Order> orders,
     		final ScheduledExecutorService scheduler,
     		final WebsocketClient websocketClient,
-    		final String baseToken,
-    		final String quoteToken,
-    		final OrderBookManager orderBookManager) {
+    		final String baseAsset,
+    		final String quoteAsset,
+    		final OrderBookManager orderBookManager,
+    		final SpreadCalculator spreadCalculator) {
 		this.restClient = restClient;
 		this.symbol = symbol;
 		this.orders = orders;
 		this.priceChangeDelayMs = priceChangeDelayMs;
-		this.priceProposals = priceProposals;
 		this.maxBalanceToUse = new BigDecimal(maxBalanceToUse);
 		this.scheduler = scheduler;
 		cancelOrdersTasks = new HashMap<>();
 		this.websocketClient = websocketClient;
-		this.baseToken = baseToken;
-		this.quoteToken = quoteToken;
+		this.baseAsset = baseAsset;
+		this.quoteAsset = quoteAsset;
 		this.orderBookManager = orderBookManager;
+		this.spreadCalculator = spreadCalculator;
+		
+		priceProposals = new ConcurrentHashMap<>();
+		priceProposals.put(Side.BUY, new PriceProposal());
+		priceProposals.put(Side.SELL, new PriceProposal());
 	}
     
     @Override
@@ -154,12 +161,12 @@ public abstract class AbstractStrategy implements Strategy {
     private void onAccountBalance(AccountBalance accountBalance) {
     	String token = accountBalance.asset();
     	BigDecimal available = accountBalance.available();
-		if (baseToken.equalsIgnoreCase(token)) {
-    		Log.infof("Base balance changed %s: %s", baseToken, available);
+		if (baseAsset.equalsIgnoreCase(token)) {
+    		Log.infof("Base balance changed %s: %s", baseAsset, available);
     		// XXX is the split needed since Side is not passed as arg anymore
     		onBaseBalanceUpdate(available);
-    	} else if (quoteToken.equalsIgnoreCase(accountBalance.asset())) {
-    		Log.infof("Quote balance changed %s: %s", quoteToken, available);
+    	} else if (quoteAsset.equalsIgnoreCase(accountBalance.asset())) {
+    		Log.infof("Quote balance changed %s: %s", quoteAsset, available);
     		onQuoteBalanceUpdate(available);
     	}
     }
@@ -174,7 +181,7 @@ public abstract class AbstractStrategy implements Strategy {
 			if (!side.isPriceOutOfRange(update.price(), proposal.currentPrice)
 					&& localOrderBookCreated) {
 				
-				BigDecimal targetPrice = getTargetPriceLevel(orderBookSide);
+				BigDecimal targetPrice = spreadCalculator.calculate(side, orderBookSide);
 				
 				Log.debugf("Target %s price: %s, proposal: %s", side, targetPrice, proposal);
 				
@@ -199,17 +206,15 @@ public abstract class AbstractStrategy implements Strategy {
 		}
 	}
 	
-	abstract BigDecimal getTargetPriceLevel(Map<BigDecimal, BigDecimal> aggregatedOrders);
-
 	private void computeInitialPrices(OrderBook orderBook) {
 		long timestamp = new Date().getTime();
-    	BigDecimal askPrice = getTargetPriceLevel(orderBook.getAsks());
+    	BigDecimal askPrice = spreadCalculator.calculate(Side.SELL, orderBook.getAsks());
     	PriceProposal askProposal = priceProposals.get(Side.SELL);
     	askProposal.currentPrice = askPrice;
     	askProposal.proposedPrice = askPrice;
     	askProposal.timestamp = timestamp;
     			
-    	BigDecimal bidPrice = getTargetPriceLevel(orderBook.getBids());
+    	BigDecimal bidPrice = spreadCalculator.calculate(Side.BUY, orderBook.getBids());
     	PriceProposal bidProposal = priceProposals.get(Side.BUY);
     	bidProposal.currentPrice = bidPrice;
     	bidProposal.proposedPrice = bidPrice;
@@ -294,4 +299,11 @@ public abstract class AbstractStrategy implements Strategy {
         	orders.putAll(ordersBeKept);
 		}
     }
+
+	@Override
+	public String getDescription() {
+		return String.format("%s - symbol: %s/%s, price change delay (ms): %d"
+				+ " , max balance to use: %s, spread: %",
+				getClass().getSimpleName(), baseAsset, quoteAsset, priceChangeDelayMs, maxBalanceToUse, spreadCalculator.describe());
+	}
 }

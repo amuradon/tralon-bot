@@ -3,20 +3,14 @@ package cz.amuradon.tralon.clm.connector.kucoin;
 
 import java.io.IOException;
 
-import org.eclipse.microprofile.config.inject.ConfigProperty;
-
 import com.kucoin.sdk.KucoinClientBuilder;
 import com.kucoin.sdk.KucoinPrivateWSClient;
 import com.kucoin.sdk.KucoinPublicWSClient;
 import com.kucoin.sdk.KucoinRestClient;
 
-import cz.amuradon.tralon.clm.BeanConfig;
-import io.quarkus.arc.profile.IfBuildProfile;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Produces;
 import jakarta.inject.Inject;
-import jakarta.inject.Named;
-import jakarta.inject.Singleton;
 
 @ApplicationScoped
 public class KucoinBeanConfig {

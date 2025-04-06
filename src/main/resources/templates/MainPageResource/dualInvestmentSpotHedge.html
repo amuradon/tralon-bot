@@ -1,6 +1,6 @@
 {@java.lang.String[] exchanges}
 
-<h3>Spot Hedging Strategy</h3>
+<h3>Dual Investment Spot Hedge Strategy</h3>
 <form hx-target="#runningStrategies" hx-post="/run-spot-hedge">
 	<label for="exchangeName">Exchange Name:</label>
 	<select name="exchangeName">
@@ -24,5 +24,15 @@
 	<label for="baseQuantity">Base Quantity:</label>
 	<input name="baseQuantity" type="number"/>
 	
+	<label for="mmSpread">Market making spread (%):</label>
+	<input name="mmSpread" type="number"/>
+	
+	<label for="apr" title="APR to calculate % around strike price">APR (%):</label>
+	<input name="apr" type="number" />
+
+	<label for="priceChangeDelayMs">Price change delay (ms):</label>
+	<input name="priceChangeDelayMs" type="number" />
+	
+	<br/>
 	<input type="submit" value="Run" />
 </form>

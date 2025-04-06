@@ -13,28 +13,36 @@ public class SpotHedgingStrategy implements Strategy {
 	private final WebsocketClient websocketClient;
 	private final String baseAsset;
 	private final String quoteAsset;
+	private final String symbol;
 	private final BigDecimal price;
 	private final BigDecimal baseQuantity;
+	private final BigDecimal marketMakingSpread;
+	private final BigDecimal apr;
+	private final int priceChangeDelayMs;
 
 	public SpotHedgingStrategy(RestClient restClient, WebsocketClient websocketClient,
-			String baseAsset, String quoteAsset, BigDecimal price, BigDecimal baseQuantity) {
+			String baseAsset, String quoteAsset, String symbol, BigDecimal price, BigDecimal baseQuantity,
+			BigDecimal marketMakingSpread, BigDecimal apr, int priceChangeDelayMs) {
 		this.restClient = restClient;
 		this.websocketClient = websocketClient;
 		this.baseAsset = baseAsset;
 		this.quoteAsset = quoteAsset;
+		this.symbol = symbol;
 		this.price = price;
 		this.baseQuantity = baseQuantity;
+		this.marketMakingSpread = marketMakingSpread;
+		this.apr = apr;
+		this.priceChangeDelayMs = priceChangeDelayMs;
 	}
 
 	@Override
 	public void start() {
 		// TODO
-		// subscribe trade (?) updates
-		//   * monitor price to place buy or sell order
-		// track order state - websocket or REST API?
-		// validate balance
-		// validate symbol
-		// validate price (might be already above)
+		// nacti order book -> mid-price
+		// pokud je cena v rozmezi +- APR za den od smluvene ceny - pouzij market making
+		// pokud je cena nad smluvena cena +APR za den -> HODL
+		// pokud je cena pod smluvenou cenou +APR za den -> prodej
+		// delay
 	}
 	
 	@Override

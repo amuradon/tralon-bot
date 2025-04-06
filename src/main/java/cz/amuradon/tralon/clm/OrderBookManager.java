@@ -4,23 +4,12 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.function.BiFunction;
 import java.util.function.Consumer;
-
-import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import cz.amuradon.tralon.clm.connector.OrderBookResponse;
 import cz.amuradon.tralon.clm.connector.OrderBookUpdate;
 import cz.amuradon.tralon.clm.connector.RestClient;
-import cz.amuradon.tralon.clm.strategies.Strategy;
 import io.quarkus.logging.Log;
-import io.quarkus.runtime.annotations.RegisterForReflection;
-import io.vertx.core.eventbus.EventBus;
-import io.vertx.core.eventbus.MessageProducer;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.context.Dependent;
-import jakarta.inject.Inject;
-import jakarta.inject.Named;
 
 public class OrderBookManager {
 

@@ -7,8 +7,6 @@ import java.math.BigDecimal;
 
 import org.junit.jupiter.api.Test;
 
-import cz.amuradon.tralon.clm.Side;
-
 public class SideTest {
 
 	@Test

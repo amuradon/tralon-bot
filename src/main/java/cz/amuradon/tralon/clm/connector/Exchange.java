@@ -9,7 +9,12 @@ import cz.amuradon.tralon.clm.connector.mexc.Mexc;
 public enum Exchange {
 
 	BINANCE("Binance", Binance.LITERAL),
-	KUCOIN("Kucoin", Kucoin.LITERAL),
+	KUCOIN("Kucoin", Kucoin.LITERAL) {
+		@Override
+		public String symbol(String baseAsset, String quoteAsset) {
+			return baseAsset + "-" + quoteAsset;
+		}
+	},
 	MEXC("MEXC", Mexc.LITERAL);
 	
 	private final String displayName;
@@ -35,5 +40,9 @@ public enum Exchange {
 			}
 		}
 		throw new IllegalArgumentException("Could not find exchange " + displayName);
+	}
+	
+	public String symbol(String baseAsset, String quoteAsset) {
+		return baseAsset + quoteAsset;
 	}
 }

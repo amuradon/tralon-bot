@@ -17,13 +17,4 @@ public class BeanConfig {
     	return new ConcurrentHashMap<>();
     }
     
-    @ApplicationScoped
-    @Produces
-    public Map<Side, PriceProposal> proposals() {
-    	ConcurrentHashMap<Side, PriceProposal> proposals = new ConcurrentHashMap<>();
-		proposals.put(Side.BUY, new PriceProposal());
-		proposals.put(Side.SELL, new PriceProposal());
-		return proposals;
-    }
-    
 }

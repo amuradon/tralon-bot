@@ -3,7 +3,6 @@ package cz.amuradon.tralon.clm.strategies;
 import java.math.BigDecimal;
 import java.util.Map;
 
-import cz.amuradon.tralon.clm.OrderBook;
 import cz.amuradon.tralon.clm.connector.OrderBookUpdate;
 
 public interface Strategy {
