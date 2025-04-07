@@ -5,7 +5,7 @@ import java.util.Map;
 
 import cz.amuradon.tralon.clm.Side;
 
-public interface SpreadCalculator {
+public interface SpreadStrategy {
 
 	BigDecimal calculate(Side side, Map<BigDecimal, BigDecimal> aggregatedOrders);
 

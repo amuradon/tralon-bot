@@ -5,7 +5,7 @@ import java.util.Map;
 
 import cz.amuradon.tralon.clm.Side;
 
-public class FirstPriceLevelSpread implements SpreadCalculator {
+public class FirstPriceLevelSpread implements SpreadStrategy {
 
 	@Override
 	public BigDecimal calculate(Side side, Map<BigDecimal, BigDecimal> aggregatedOrders) {

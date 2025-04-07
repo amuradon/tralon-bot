@@ -1,4 +1,4 @@
-{@java.util.Map<UUID, cz.amuradon.tralon.clm.strategies.Strategy> runningStrategies}
+{@java.util.Map<java.lang.String, cz.amuradon.tralon.clm.strategies.Strategy> runningStrategies}
 
 <table>
   <thead>
@@ -13,7 +13,7 @@
 	    <td>{item.key}</td>
 	    <td>{item.value.description}</td>
 	    <td>
-	    	<button hx-target="#runningStrategies" hx-post="/stop-strategy" name="stopUuid" value="{item.key}">
+	    	<button hx-target="#runningStrategies" hx-post="/stop-strategy" name="stopId" value="{item.key}">
 	    		STOP
 	   		</button>
 	 	</td>

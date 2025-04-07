@@ -7,7 +7,7 @@ import java.util.function.BiFunction;
 
 import cz.amuradon.tralon.clm.Side;
 
-public class PercentFromBestSpread implements SpreadCalculator {
+public class PercentFromBestSpread implements SpreadStrategy {
 
 	private final BigDecimal percent;
 	

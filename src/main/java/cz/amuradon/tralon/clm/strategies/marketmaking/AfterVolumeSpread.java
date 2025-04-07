@@ -6,12 +6,12 @@ import java.util.Map.Entry;
 
 import cz.amuradon.tralon.clm.Side;
 
-public class AfterVolumeSpread implements SpreadCalculator {
+public class AfterVolumeSpread implements SpreadStrategy {
 
 	private final BigDecimal volumeThreshold;
 	
-    public AfterVolumeSpread(final int volumeThreshold) {
-    	this.volumeThreshold = new BigDecimal(volumeThreshold);
+    public AfterVolumeSpread(final BigDecimal volumeThreshold) {
+    	this.volumeThreshold = volumeThreshold;
 	}
 	
     @Override

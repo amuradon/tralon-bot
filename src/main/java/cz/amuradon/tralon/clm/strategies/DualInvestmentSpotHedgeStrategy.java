@@ -7,7 +7,7 @@ import cz.amuradon.tralon.clm.connector.OrderBookUpdate;
 import cz.amuradon.tralon.clm.connector.RestClient;
 import cz.amuradon.tralon.clm.connector.WebsocketClient;
 
-public class SpotHedgingStrategy implements Strategy {
+public class DualInvestmentSpotHedgeStrategy implements Strategy {
 	
 	private final RestClient restClient;
 	private final WebsocketClient websocketClient;
@@ -20,7 +20,7 @@ public class SpotHedgingStrategy implements Strategy {
 	private final BigDecimal apr;
 	private final int priceChangeDelayMs;
 
-	public SpotHedgingStrategy(RestClient restClient, WebsocketClient websocketClient,
+	public DualInvestmentSpotHedgeStrategy(RestClient restClient, WebsocketClient websocketClient,
 			String baseAsset, String quoteAsset, String symbol, BigDecimal price, BigDecimal baseQuantity,
 			BigDecimal marketMakingSpread, BigDecimal apr, int priceChangeDelayMs) {
 		this.restClient = restClient;

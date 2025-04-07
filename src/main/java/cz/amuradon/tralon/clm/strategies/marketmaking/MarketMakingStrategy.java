@@ -55,34 +55,32 @@ public class MarketMakingStrategy implements Strategy {
 	
     private final OrderBookManager orderBookManager;
     
-    private final SpreadCalculator spreadCalculator;
+    private final SpreadStrategy spreadCalculator;
 
 	private boolean localOrderBookCreated;
 	
     public MarketMakingStrategy(
-    		final int priceChangeDelayMs,
     		final RestClient restClient,
-    		final String symbol,
-    		final int maxBalanceToUse,
-    		final Map<String, Order> orders,
-    		final ScheduledExecutorService scheduler,
     		final WebsocketClient websocketClient,
     		final String baseAsset,
     		final String quoteAsset,
-    		final OrderBookManager orderBookManager,
-    		final SpreadCalculator spreadCalculator) {
+    		final String symbol,
+    		final int priceChangeDelayMs,
+    		final BigDecimal maxBalanceToUse,
+    		final ScheduledExecutorService scheduler,
+    		final SpreadStrategy spreadCalculator) {
 		this.restClient = restClient;
-		this.symbol = symbol;
-		this.orders = orders;
-		this.priceChangeDelayMs = priceChangeDelayMs;
-		this.maxBalanceToUse = new BigDecimal(maxBalanceToUse);
-		this.scheduler = scheduler;
-		cancelOrdersTasks = new HashMap<>();
 		this.websocketClient = websocketClient;
 		this.baseAsset = baseAsset;
 		this.quoteAsset = quoteAsset;
-		this.orderBookManager = orderBookManager;
+		this.symbol = symbol;
+		this.priceChangeDelayMs = priceChangeDelayMs;
+		this.maxBalanceToUse = maxBalanceToUse;
+		this.scheduler = scheduler;
+		this.orderBookManager = new OrderBookManager(restClient);
 		this.spreadCalculator = spreadCalculator;
+		this.orders = new ConcurrentHashMap<>();
+		cancelOrdersTasks = new HashMap<>();
 		
 		priceProposals = new ConcurrentHashMap<>();
 		priceProposals.put(Side.BUY, new PriceProposal());

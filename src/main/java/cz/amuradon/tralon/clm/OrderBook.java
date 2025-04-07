@@ -4,9 +4,6 @@ import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
 
-import jakarta.enterprise.context.ApplicationScoped;
-
-@ApplicationScoped
 public class OrderBook { 
 	
 	private long sequence;

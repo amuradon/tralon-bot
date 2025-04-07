@@ -21,10 +21,9 @@ public class OrderBookManager {
     
     private List<OrderBookUpdate> orderBookUpdates;
     
-	public OrderBookManager(final RestClient restClient,
-			final OrderBook orderBook) {
+	public OrderBookManager(final RestClient restClient) {
 		this.restClient = restClient;
-		this.orderBook = orderBook;
+		this.orderBook = new OrderBook(); 
 		orderBookUpdates = new ArrayList<>(50);
 		processor = u -> {
 			synchronized (orderBookUpdates) {

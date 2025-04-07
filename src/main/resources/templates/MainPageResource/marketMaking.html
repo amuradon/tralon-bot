@@ -1,1 +1,40 @@
-<span>Not yet implemented</span>
+{@java.lang.String[] exchanges}
+{@java.util.Map<String, String> spreadStrategies}
+
+<h3>Market Making Strategy</h3>
+<form hx-target="#runningStrategies" hx-post="/run-market-making">
+	<label for="exchangeName">Exchange Name:</label>
+	<select name="exchangeName">
+	  {#for name in exchanges}
+		<option value="{name}">{name}</option>
+	  {/for}
+	</select>
+	
+	<label for="baseAsset">Base Asset:</label>
+	<input name="baseAsset" type="text"/>
+	
+	<label for="quoteAsset">Quote Asset:</label>
+	<input name="quoteAsset" type="text" value="USDT"/>
+
+	<label for="baseQuantity">Base Quantity:</label>
+	<input name="baseQuantity" type="number"/>
+	
+	<label for="priceChangeDelayMs">Price change delay (ms):</label>
+	<input name="priceChangeDelayMs" type="number" />
+
+	<label for="spreadStrategy">Spread Strategy:</label>
+	<select name="spreadStrategy" _="on change put @data-propertyText into #spreadStrategyValueLabel innerHTML">
+	  {#for item in spreadStrategies}
+		<option value="{item.key}" data-propertyText="{item.value}">{item.key}</option>
+	  {/for}
+	</select>
+
+	<div id="spreadStrategyValue">
+		<label id="spreadStrategyValueLabel" for="spreadStrategyValue">Spread strategy value:</label>
+		<input name="spreadStrategyValue" type="number"/>
+	</div>
+	
+	
+	<br/>
+	<input type="submit" value="Run" />
+</form>
