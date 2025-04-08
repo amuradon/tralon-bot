@@ -2,12 +2,15 @@ package cz.amuradon.tralon.clm.connector.kucoin;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import com.kucoin.sdk.rest.request.OrderCreateApiRequest;
 import com.kucoin.sdk.rest.request.OrderCreateApiRequest.OrderCreateApiRequestBuilder;
+import com.kucoin.sdk.rest.response.SymbolResponse;
 
 import cz.amuradon.tralon.clm.OrderType;
 import cz.amuradon.tralon.clm.Side;
@@ -28,9 +31,14 @@ public class KucoinRestClient implements RestClient {
 
 	private final com.kucoin.sdk.KucoinRestClient restClient;
 	
+	private final Map<String, Integer> sizeScales;
+	private final Map<String, Integer> priceScales;
+	
 	@Inject
 	public KucoinRestClient(final com.kucoin.sdk.KucoinRestClient restClient) {
 		this.restClient = restClient;
+		sizeScales = new ConcurrentHashMap<>();
+		priceScales = new ConcurrentHashMap<>();
 	}
 	
 	@Override
@@ -81,12 +89,25 @@ public class KucoinRestClient implements RestClient {
 	
 	@Override
 	public void cacheSymbolDetails(String symbol) {
-		// TODO implement
+		if (priceScales.get(symbol) != null && sizeScales.get(symbol) != null) {
+			return;
+		}
+
+		try {
+			SymbolResponse symbolDetails = restClient.symbolAPI().getSymbolDetail(symbol);
+			priceScales.put(symbol, symbolDetails.getPriceIncrement().stripTrailingZeros().scale());
+			sizeScales.put(symbol, symbolDetails.getBaseIncrement().stripTrailingZeros().scale());
+		} catch (IOException e) {
+			throw new IllegalStateException("Could not get symbol details.", e);
+		}
 	}
 	
 	public final class KucoinNewOrderBuilder implements NewOrderBuilder {
 		
-		OrderCreateApiRequestBuilder builder = OrderCreateApiRequest.builder();
+		private OrderCreateApiRequestBuilder builder = OrderCreateApiRequest.builder();
+		private String symbol;
+		private BigDecimal size;
+		private BigDecimal price;
 
 		@Override
 		public NewOrderBuilder clientOrderId(String clientOrderId) {
@@ -103,18 +124,19 @@ public class KucoinRestClient implements RestClient {
 		@Override
 		public NewOrderBuilder symbol(String symbol) {
 			builder.symbol(symbol);
+			this.symbol = symbol;
 			return this;
 		}
 
 		@Override
 		public NewOrderBuilder price(BigDecimal price) {
-			builder.price(price);
+			this.price = price;
 			return this;
 		}
 
 		@Override
 		public NewOrderBuilder size(BigDecimal size) {
-			builder.size(size);
+			this.size = size;
 			return this;
 		}
 
@@ -126,6 +148,16 @@ public class KucoinRestClient implements RestClient {
 
 		@Override
 		public String send() {
+			if (symbol == null) {
+				throw new IllegalArgumentException("Could not send order - symbol is missing.");
+			}
+			
+			Integer quantityScale = sizeScales.get(symbol);
+			builder.size(size.setScale(quantityScale, RoundingMode.HALF_UP));
+
+			Integer priceScale = priceScales.get(symbol);
+			builder.price(price.setScale(priceScale, RoundingMode.HALF_UP));
+
 			try {
 				return restClient.orderAPI().createOrder(builder.build()).getOrderId();
 			} catch (IOException e) {
