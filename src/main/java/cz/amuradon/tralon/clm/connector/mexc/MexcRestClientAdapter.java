@@ -1,6 +1,7 @@
 package cz.amuradon.tralon.clm.connector.mexc;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.util.Date;
@@ -9,6 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.StringJoiner;
 
 import javax.crypto.Mac;
@@ -37,6 +39,9 @@ public class MexcRestClientAdapter implements RestClient {
 	
 	private Mac mac;
 	
+	private final Map<String, Integer> quantityScales;
+	private final Map<String, Integer> priceScales;
+	
 	@Inject
 	public MexcRestClientAdapter(@ConfigProperty(name = "mexc.secretKey") final String secretKey,
 			@org.eclipse.microprofile.rest.client.inject.RestClient final MexcClient mexcClient) {
@@ -47,6 +52,8 @@ public class MexcRestClientAdapter implements RestClient {
 		} catch (NoSuchAlgorithmException | InvalidKeyException e) {
 			throw new IllegalStateException("Could not setup encoder", e);
 		}
+		quantityScales = new ConcurrentHashMap<>();
+		priceScales = new ConcurrentHashMap<>();
 	}
 	
 	@Override
@@ -56,7 +63,6 @@ public class MexcRestClientAdapter implements RestClient {
     	params.put("orderId", order.orderId());
     	params.put("timestamp", String.valueOf(new Date().getTime()));
     	
-    	// XXX should return OrderResponse?
     	mexcClient.cancelOrder(signQueryParams(params));
 	}
 
@@ -79,13 +85,20 @@ public class MexcRestClientAdapter implements RestClient {
 
 	@Override
 	public void cacheSymbolDetails(String symbol) {
-		// TODO Auto-generated method stub
+		if (priceScales.get(symbol) != null && quantityScales.get(symbol) != null) {
+			return;
+		}
+		
+		ExchangeInfo exchnageInfo = mexcClient.exchangeInfo(symbol);
+		SymbolInfo symbolInfo = exchnageInfo.symbols().get(0);
+		
+		quantityScales.put(symbol, symbolInfo.baseSizePrecision().stripTrailingZeros().scale());
+		priceScales.put(symbol, symbolInfo.quoteAssetPrecision());
 	}
 
 	@Override
 	public NewOrderBuilder newOrder() {
-		// TODO Auto-generated method stub
-		return null;
+		return new MexcNewOrderRequestBuilder();
 	}
 
 	public Map<String, String> signQueryParams(Map<String, String> params) {
@@ -103,6 +116,9 @@ public class MexcRestClientAdapter implements RestClient {
     	private static final String TIMESTAMP = "timestamp";
 		private Map<String, String> params = new LinkedHashMap<>();
 		private boolean signed = false;
+		private String symbol;
+		private BigDecimal quantity;
+		private BigDecimal price;
     	
 		public NewOrderBuilder clientOrderId(String clientOrderId) {
 			params.put("newClientOrderId", clientOrderId);
@@ -118,6 +134,7 @@ public class MexcRestClientAdapter implements RestClient {
 
     	public NewOrderBuilder symbol(String symbol) {
     		params.put("symbol", symbol);
+    		this.symbol = symbol;
     		signed = false;
     		return this;
     	}
@@ -129,13 +146,13 @@ public class MexcRestClientAdapter implements RestClient {
     	}
     	
     	public NewOrderBuilder size(BigDecimal size) {
-    		params.put("quantity", size.toPlainString());
+    		this.quantity = size;
     		signed = false;
     		return this;
     	}
    
     	public NewOrderBuilder price(BigDecimal price) {
-    		params.put("price", price.toPlainString());
+    		this.price = price;
     		signed = false;
     		return this;
     	}
@@ -159,12 +176,21 @@ public class MexcRestClientAdapter implements RestClient {
     	}
     	
     	public String send() {
+    		if (symbol == null) {
+				throw new IllegalArgumentException("Could not send order - symbol is missing.");
+			}
+			
+			Integer quantityScale = quantityScales.get(symbol);
+			params.put("quantity", quantity.setScale(quantityScale, RoundingMode.HALF_UP).toPlainString());
+
+			Integer priceScale = priceScales.get(symbol);
+			params.put("price", price.setScale(priceScale, RoundingMode.HALF_UP).toPlainString());
+			
     		if (params.get(TIMESTAMP) == null) {
     			params.put(TIMESTAMP, String.valueOf(new Date().getTime()));
     			signed = false;
     		}
     		
-    		// XXX should return OrderResponse?
     		return mexcClient.newOrder(signed ? params : signQueryParams(params)).orderId();
     	}
 

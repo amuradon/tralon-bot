@@ -169,10 +169,10 @@ public class BinanceRestClient implements RestClient {
 			}
 			
 			Integer quantityScale = quantityScales.get(symbol);
-			parameters.put("quantity", quantity.setScale(quantityScale, RoundingMode.HALF_UP));
+			parameters.put("quantity", quantity.setScale(quantityScale, RoundingMode.HALF_UP).toPlainString());
 
 			Integer priceScale = priceScales.get(symbol);
-			parameters.put("price", price.setScale(priceScale, RoundingMode.HALF_UP));
+			parameters.put("price", price.setScale(priceScale, RoundingMode.HALF_UP).toPlainString());
 			
 			return spotClient.createTrade().newOrder(parameters);
 		}

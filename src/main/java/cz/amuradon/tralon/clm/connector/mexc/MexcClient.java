@@ -21,7 +21,7 @@ public interface MexcClient {
 
 	@Path("/exchangeInfo")
 	@GET
-	String exchangeInfo();
+	ExchangeInfo exchangeInfo(@RestQuery String symbol);
 
 	@Path("/depth")
 	@GET
