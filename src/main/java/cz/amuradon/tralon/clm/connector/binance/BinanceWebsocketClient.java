@@ -33,13 +33,17 @@ public class BinanceWebsocketClient implements WebsocketClient {
 	private Consumer<AccountBalance> accountBalanceCallback;
 	private Consumer<OrderChange> orderChangeCallback;
 	
+	private boolean connected;
+	
 	public BinanceWebsocketClient(final SpotClient spotClient) {
 		this.spotClient = spotClient;
 		mapper = new ObjectMapper();
 		accountBalanceCallback = e -> {};
 		orderChangeCallback = e -> {};
 		client = new WebSocketStreamClientImpl();
-		
+	}
+	
+	private boolean connect() {
 		String listenKey;
 		try {
 			listenKey = mapper.readTree(spotClient.createUserData().createListenKey()).get("listenKey").asText();
@@ -65,6 +69,7 @@ public class BinanceWebsocketClient implements WebsocketClient {
 	            // Po 24 h se zavre -> obnovit
 	            // reagovat na close, failure atd.
 	        }));
+	        return true;
 		} catch (JsonProcessingException e) {
 			throw new IllegalStateException("Could not parse Websocket JSON", e);
 		}
@@ -72,11 +77,17 @@ public class BinanceWebsocketClient implements WebsocketClient {
 	
 	@Override
 	public void onOrderChange(Consumer<OrderChange> callback) {
+		if (!connected) {
+			connected = connect();
+		}
 		orderChangeCallback = callback;
 	}
 
 	@Override
 	public void onOrderBookChange(Consumer<OrderBookChange> callback, String symbol) {
+		if (!connected) {
+			connected = connect();
+		}
 		client.diffDepthStream(symbol, 100, data -> {
 			try {
 				callback.accept(mapper.readValue(data, BinanceOrderBookChange.class));
@@ -88,6 +99,9 @@ public class BinanceWebsocketClient implements WebsocketClient {
 
 	@Override
 	public void onAccountBalance(Consumer<AccountBalance> callback) {
+		if (!connected) {
+			connected = connect();
+		}
 		accountBalanceCallback = callback;
 	}
 

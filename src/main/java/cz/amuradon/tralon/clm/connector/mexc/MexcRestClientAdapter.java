@@ -1,5 +1,7 @@
 package cz.amuradon.tralon.clm.connector.mexc;
 
+import static cz.amuradon.tralon.clm.connector.RequestUtils.param;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.security.InvalidKeyException;
@@ -10,9 +12,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.StringJoiner;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
-import java.util.StringJoiner;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -59,29 +61,21 @@ public class MexcRestClientAdapter implements RestClient {
 	
 	@Override
 	public void cancelOrder(Order order) {
-		Map<String, String> params = new LinkedHashMap<>();
-    	params.put("symbol", order.symbol());
-    	params.put("orderId", order.orderId());
-    	params.put("timestamp", String.valueOf(new Date().getTime()));
-    	
-    	mexcClient.cancelOrder(signQueryParams(params));
+    	mexcClient.cancelOrder(
+    			param("timestamp", new Date().getTime())
+    			.param("symbol", order.symbol())
+    			.param("orderId", order.orderId()));
 	}
 
 	@Override
 	public Map<String, Order> listOrders(String symbol) {
-		Map<String, String> params = new LinkedHashMap<>();
-		params.put("symbol", symbol);
-		params.put("timestamp", String.valueOf(new Date().getTime()));
-
-		return mexcClient.openOrders(signQueryParams(params)).stream().collect(Collectors.toMap(o -> o.orderId(), o -> o));
+		return mexcClient.openOrders(signQueryParams(param("timestamp", new Date().getTime()).param("symbol", symbol)))
+				.stream().collect(Collectors.toMap(o -> o.orderId(), o -> o));
 	}
 
 	@Override
 	public List<? extends AccountBalance> listBalances() {
-		Map<String, String> params = new LinkedHashMap<>();
-		params.put("timestamp", String.valueOf(new Date().getTime()));
-		
-		return mexcClient.listBalances(signQueryParams(params));
+		return mexcClient.listBalances(signQueryParams(param("timestamp", new Date().getTime())));
 	}
 
 	@Override
@@ -107,9 +101,9 @@ public class MexcRestClientAdapter implements RestClient {
 		return new MexcNewOrderRequestBuilder();
 	}
 
-	public Map<String, String> signQueryParams(Map<String, String> params) {
+	public Map<String, Object> signQueryParams(Map<String, Object> params) {
     	StringJoiner joiner = new StringJoiner("&");
-    	for (Entry<String, String> entry : params.entrySet()) {
+    	for (Entry<String, Object> entry : params.entrySet()) {
 			joiner.add(entry.getKey() + "=" + entry.getValue());
 		}
     	String signature = HexFormat.of().formatHex(mac.doFinal(joiner.toString().getBytes()));
@@ -117,10 +111,15 @@ public class MexcRestClientAdapter implements RestClient {
     	return params;
     }
 	
+	@Override
+	public String userDataStream() {
+		return mexcClient.userDataStream(signQueryParams(param("timestamp", new Date().getTime()))).listenKey();
+	}
+	
 	public class MexcNewOrderRequestBuilder implements NewOrderBuilder {
     	
     	private static final String TIMESTAMP = "timestamp";
-		private Map<String, String> params = new LinkedHashMap<>();
+		private Map<String, Object> params = new LinkedHashMap<>();
 		private boolean signed = false;
 		private String symbol;
 		private BigDecimal quantity;

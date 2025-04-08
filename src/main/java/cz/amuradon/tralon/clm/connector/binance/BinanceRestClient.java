@@ -1,5 +1,7 @@
 package cz.amuradon.tralon.clm.connector.binance;
 
+import static cz.amuradon.tralon.clm.connector.RequestUtils.param;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.HashMap;
@@ -17,6 +19,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.amuradon.tralon.clm.OrderType;
 import cz.amuradon.tralon.clm.Side;
 import cz.amuradon.tralon.clm.connector.AccountBalance;
+import cz.amuradon.tralon.clm.connector.ListenKey;
 import cz.amuradon.tralon.clm.connector.OrderBookResponse;
 import cz.amuradon.tralon.clm.connector.OrderBookResponseImpl;
 import cz.amuradon.tralon.clm.connector.RestClient;
@@ -80,7 +83,7 @@ public class BinanceRestClient implements RestClient {
 	@Override
 	public OrderBookResponse orderBook(String symbol) {
 		try {
-			String response = spotClient.createMarket().depth( param("symbol", symbol).param("limit", 5000));
+			String response = spotClient.createMarket().depth(param("symbol", symbol).param("limit", 5000));
 			BinanceOrderBookResponse orderBookResponse = mapper.readValue(response, BinanceOrderBookResponse.class);
 			return new OrderBookResponseImpl(orderBookResponse.sequence(),
 					orderBookResponse.asks(), orderBookResponse.bids());
@@ -113,6 +116,15 @@ public class BinanceRestClient implements RestClient {
 			throw new IllegalStateException("Could not read exchange info.", e);
 		}
 		
+	}
+	
+	@Override
+	public String userDataStream() {
+		try {
+			return mapper.readValue(spotClient.createUserData().createListenKey(), ListenKey.class).listenKey();
+		} catch (JsonProcessingException e) {
+			throw new IllegalStateException("Could not read listen key.", e);
+		}
 	}
 
 	public final class BinanceNewOrderBuilder implements NewOrderBuilder {
@@ -177,19 +189,5 @@ public class BinanceRestClient implements RestClient {
 			return spotClient.createTrade().newOrder(parameters);
 		}
 	}
-	
-	private ParamsBuilder param(String key, Object value) {
-		return new ParamsBuilder().param(key, value);
-	}
 
-	private static final class ParamsBuilder extends LinkedHashMap<String, Object> {
-		
-		private static final long serialVersionUID = 1L;
-
-		ParamsBuilder param(String key, Object value) {
-			put(key, value);
-			return this;
-		}
-
-	}
 }

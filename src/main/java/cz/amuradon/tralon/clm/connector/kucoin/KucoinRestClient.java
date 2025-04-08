@@ -102,6 +102,12 @@ public class KucoinRestClient implements RestClient {
 		}
 	}
 	
+	@Override
+	public String userDataStream() {
+		// Kucoin's websocket clients handle this internally, REST client does not seem to even provide it
+		throw new UnsupportedOperationException("KucoinRestClient#userDataStream not available. Was not needed so far");
+	}
+	
 	public final class KucoinNewOrderBuilder implements NewOrderBuilder {
 		
 		private OrderCreateApiRequestBuilder builder = OrderCreateApiRequest.builder();

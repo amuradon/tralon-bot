@@ -1,4 +1,4 @@
-package cz.amuradon.tralon.clm.connector.mexc;
+package cz.amuradon.tralon.clm.connector;
 
 public record ListenKey(String listenKey) {
 
