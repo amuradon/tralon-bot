@@ -60,7 +60,7 @@ public class BinanceRestClient implements RestClient {
 	public Map<String, Order> listOrders(String symbol) {
 		final String response = spotClient.createTrade().getOpenOrders(param("symbol", symbol));
 		try {
-			return mapper.readValue(response, new TypeReference<List<BinanceOrder>>() { })
+			return mapper.readValue(response, new TypeReference<List<BinanceMexcOrder>>() { })
 					.stream().collect(Collectors.toMap(o -> o.orderId(), o -> o));
 		} catch (JsonProcessingException e) {
 			throw new IllegalStateException("Could not read open orders.", e);
@@ -71,7 +71,7 @@ public class BinanceRestClient implements RestClient {
 	public List<? extends AccountBalance> listBalances() {
 		final String response = spotClient.createTrade().account(new LinkedHashMap<>());
 		try {
-			return mapper.readValue(response, BinanceAccountInformation.class).balances();
+			return mapper.readValue(response, BinanceMexcAccountInformation.class).balances();
 		} catch (JsonProcessingException e) {
 			throw new IllegalStateException("Could not read account information.", e);
 		}

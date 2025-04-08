@@ -11,7 +11,7 @@ import cz.amuradon.tralon.clm.connector.AccountBalance;
  * Used for REST API response.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record BinanceAccountBalance(@JsonProperty("asset") String asset,
+public record BinanceMexcAccountBalance(@JsonProperty("asset") String asset,
 		@JsonProperty("free") BigDecimal available) implements AccountBalance {
 
 }

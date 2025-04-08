@@ -10,7 +10,7 @@ import cz.amuradon.tralon.clm.Side;
 import cz.amuradon.tralon.clm.model.Order;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class BinanceOrder implements Order {
+public class BinanceMexcOrder implements Order {
 
 	private String orderId;
 	private String symbol;
@@ -19,7 +19,7 @@ public class BinanceOrder implements Order {
 	private BigDecimal price;
 
 	@JsonCreator
-	public BinanceOrder(@JsonProperty("orderId") String orderId,
+	public BinanceMexcOrder(@JsonProperty("orderId") String orderId,
 			@JsonProperty("symbol") String symbol,
 			@JsonProperty("origQty") BigDecimal origQty,
 			@JsonProperty("side") Side side,

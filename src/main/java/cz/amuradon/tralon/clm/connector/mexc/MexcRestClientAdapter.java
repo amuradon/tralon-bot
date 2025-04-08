@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 import java.util.StringJoiner;
 
 import javax.crypto.Mac;
@@ -68,14 +69,19 @@ public class MexcRestClientAdapter implements RestClient {
 
 	@Override
 	public Map<String, Order> listOrders(String symbol) {
-		// TODO Auto-generated method stub
-		return null;
+		Map<String, String> params = new LinkedHashMap<>();
+		params.put("symbol", symbol);
+		params.put("timestamp", String.valueOf(new Date().getTime()));
+
+		return mexcClient.openOrders(signQueryParams(params)).stream().collect(Collectors.toMap(o -> o.orderId(), o -> o));
 	}
 
 	@Override
 	public List<? extends AccountBalance> listBalances() {
-		// TODO Auto-generated method stub
-		return null;
+		Map<String, String> params = new LinkedHashMap<>();
+		params.put("timestamp", String.valueOf(new Date().getTime()));
+		
+		return mexcClient.listBalances(signQueryParams(params));
 	}
 
 	@Override
