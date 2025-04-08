@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import com.binance.connector.client.SpotClient;
@@ -33,12 +34,15 @@ public class BinanceRestClient implements RestClient {
 	
 	private final ObjectMapper mapper;
 	
-	private int sizeScale = 4;
+	private final Map<String, Integer> quantityScales;
+	private final Map<String, Integer> priceScales;
 	
 	@Inject
 	public BinanceRestClient(SpotClient spotClient) {
 		this.spotClient = spotClient;
 		mapper = new ObjectMapper();
+		quantityScales = new ConcurrentHashMap<>();
+		priceScales = new ConcurrentHashMap<>();
 	}
 	
 	@Override
@@ -87,6 +91,10 @@ public class BinanceRestClient implements RestClient {
 	
 	@Override
 	public void cacheSymbolDetails(String symbol) {
+		if (priceScales.get(symbol) != null && quantityScales.get(symbol) != null) {
+			return;
+		}
+
 		try {
 			String response = spotClient.createMarket().exchangeInfo(param("symbol", symbol));
 			ExchangeInfo exchangeInfo = mapper.readValue(response, ExchangeInfo.class);
@@ -94,9 +102,9 @@ public class BinanceRestClient implements RestClient {
 				if (symbol.equalsIgnoreCase(symbolInfo.symbol())) {
 					for (Filter filter : symbolInfo.filters())
 						if ("LOT_SIZE".equalsIgnoreCase(filter.filterType)) {
-							String stepSize = filter.get("stepSize");
-							sizeScale = new BigDecimal(stepSize).stripTrailingZeros().scale();
-							break;
+							quantityScales.put(symbol, new BigDecimal(filter.get("stepSize")).stripTrailingZeros().scale());
+						} else if ("PRICE_FILTER".equalsIgnoreCase(filter.filterType)) {
+							priceScales.put(symbol, new BigDecimal(filter.get("tickSize")).stripTrailingZeros().scale());
 						}
 					break;
 				}
@@ -110,6 +118,9 @@ public class BinanceRestClient implements RestClient {
 	public final class BinanceNewOrderBuilder implements NewOrderBuilder {
 
 		private final Map<String, Object> parameters = new HashMap<>();
+		private String symbol;
+		private BigDecimal quantity;
+		private BigDecimal price;
 		
 		@Override
 		public NewOrderBuilder clientOrderId(String clientOrderId) {
@@ -126,18 +137,19 @@ public class BinanceRestClient implements RestClient {
 		@Override
 		public NewOrderBuilder symbol(String symbol) {
 			parameters.put("symbol", symbol);
+			this.symbol = symbol;
 			return this;
 		}
 
 		@Override
 		public NewOrderBuilder price(BigDecimal price) {
-			parameters.put("price", price);
+			this.price = price;
 			return this;
 		}
 
 		@Override
 		public NewOrderBuilder size(BigDecimal size) {
-			parameters.put("quantity", size.setScale(sizeScale, RoundingMode.DOWN));
+			this.quantity = size;
 			return this;
 		}
 
@@ -152,6 +164,16 @@ public class BinanceRestClient implements RestClient {
 
 		@Override
 		public String send() {
+			if (symbol == null) {
+				throw new IllegalArgumentException("Could not send order - symbol is missing.");
+			}
+			
+			Integer quantityScale = quantityScales.get(symbol);
+			parameters.put("quantity", quantity.setScale(quantityScale, RoundingMode.HALF_UP));
+
+			Integer priceScale = priceScales.get(symbol);
+			parameters.put("price", price.setScale(priceScale, RoundingMode.HALF_UP));
+			
 			return spotClient.createTrade().newOrder(parameters);
 		}
 	}

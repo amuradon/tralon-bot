@@ -32,14 +32,12 @@ public class BinanceWebsocketClient implements WebsocketClient {
 	
 	private Consumer<AccountBalance> accountBalanceCallback;
 	private Consumer<OrderChange> orderChangeCallback;
-	private Consumer<OrderBookChange> orderBookChangeCallback;
 	
 	public BinanceWebsocketClient(final SpotClient spotClient) {
 		this.spotClient = spotClient;
 		mapper = new ObjectMapper();
 		accountBalanceCallback = e -> {};
 		orderChangeCallback = e -> {};
-		orderBookChangeCallback = e -> {};
 		client = new WebSocketStreamClientImpl();
 		
 		String listenKey;
