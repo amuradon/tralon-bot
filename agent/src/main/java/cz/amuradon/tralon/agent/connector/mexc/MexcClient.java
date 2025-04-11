@@ -10,8 +10,6 @@ import org.jboss.resteasy.reactive.RestQuery;
 
 import cz.amuradon.tralon.agent.connector.ListenKey;
 import cz.amuradon.tralon.agent.connector.OrderBookResponse;
-import cz.amuradon.tralon.agent.connector.binance.BinanceMexcAccountBalance;
-import cz.amuradon.tralon.agent.connector.binance.BinanceMexcOrder;
 import io.quarkus.rest.client.reactive.ClientQueryParam;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
@@ -35,12 +33,12 @@ public interface MexcClient {
 	@Path("/account")
 	@GET
 	@ClientHeaderParam(name = "X-MEXC-APIKEY", value = "${mexc.apiKey}")
-	List<BinanceMexcAccountBalance> listBalances(@RestQuery Map<String, Object> queryParams);
+	List<MexcAccountBalance> listBalances(@RestQuery Map<String, Object> queryParams);
 	
 	@Path("/openOrders")
 	@GET
 	@ClientHeaderParam(name = "X-MEXC-APIKEY", value = "${mexc.apiKey}")
-	List<BinanceMexcOrder> openOrders(@RestQuery Map<String, Object> queryParams);
+	List<MexcOrder> openOrders(@RestQuery Map<String, Object> queryParams);
 	
 	@Path("/order")
 	@POST

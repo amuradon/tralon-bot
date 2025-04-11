@@ -19,8 +19,10 @@ import cz.amuradon.tralon.agent.connector.OrderBookResponse;
 import cz.amuradon.tralon.agent.connector.OrderBookResponseImpl;
 import cz.amuradon.tralon.agent.connector.RestClient;
 import cz.amuradon.tralon.agent.connector.RestClientFactory;
+import cz.amuradon.tralon.agent.connector.RestClient.NewOrderBuilder;
 import cz.amuradon.tralon.agent.model.Order;
 import cz.amuradon.tralon.agent.model.OrderImpl;
+import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -149,6 +151,24 @@ public class KucoinRestClient implements RestClient {
 		@Override
 		public NewOrderBuilder type(OrderType type) {
 			builder.type(type.name().toLowerCase());
+			return this;
+		}
+		
+		@Override
+		public NewOrderBuilder timestamp(long timestamp) {
+			Log.warn("New order 'timestamp' parameter not supported as of now as Kucoin SDK client does not expose it");
+			return this;
+		}
+
+		@Override
+		public NewOrderBuilder recvWindow(long recvWindow) {
+			Log.warn("New order 'recvWindow' parameter not supported as of now as Kucoin SDK client does not expose it");
+			return this;
+		}
+
+		@Override
+		public NewOrderBuilder signParams() {
+			Log.warn("New order signing not supported as of now as Kucoin SDK client does not expose it");
 			return this;
 		}
 

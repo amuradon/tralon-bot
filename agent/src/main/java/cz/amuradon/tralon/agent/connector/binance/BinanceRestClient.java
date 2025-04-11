@@ -24,7 +24,9 @@ import cz.amuradon.tralon.agent.connector.OrderBookResponse;
 import cz.amuradon.tralon.agent.connector.OrderBookResponseImpl;
 import cz.amuradon.tralon.agent.connector.RestClient;
 import cz.amuradon.tralon.agent.connector.RestClientFactory;
+import cz.amuradon.tralon.agent.connector.RestClient.NewOrderBuilder;
 import cz.amuradon.tralon.agent.model.Order;
+import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -63,7 +65,7 @@ public class BinanceRestClient implements RestClient {
 	public Map<String, Order> listOrders(String symbol) {
 		final String response = spotClient.createTrade().getOpenOrders(param("symbol", symbol));
 		try {
-			return mapper.readValue(response, new TypeReference<List<BinanceMexcOrder>>() { })
+			return mapper.readValue(response, new TypeReference<List<BinanceOrder>>() { })
 					.stream().collect(Collectors.toMap(o -> o.orderId(), o -> o));
 		} catch (JsonProcessingException e) {
 			throw new IllegalStateException("Could not read open orders.", e);
@@ -74,7 +76,7 @@ public class BinanceRestClient implements RestClient {
 	public List<? extends AccountBalance> listBalances() {
 		final String response = spotClient.createTrade().account(new LinkedHashMap<>());
 		try {
-			return mapper.readValue(response, BinanceMexcAccountInformation.class).balances();
+			return mapper.readValue(response, BinanceAccountInformation.class).balances();
 		} catch (JsonProcessingException e) {
 			throw new IllegalStateException("Could not read account information.", e);
 		}
@@ -173,6 +175,24 @@ public class BinanceRestClient implements RestClient {
 			}
 			return this;
 		}
+		
+		@Override
+		public NewOrderBuilder timestamp(long timestamp) {
+			parameters.put("timestamp", timestamp);
+			return this;
+		}
+
+		@Override
+		public NewOrderBuilder recvWindow(long recvWindow) {
+			parameters.put("recvWindow", recvWindow);
+			return this;
+		}
+
+		@Override
+		public NewOrderBuilder signParams() {
+			Log.warn("New order signing not supported as of now as Binance SDK client does not expose it");
+			return this;
+		}
 
 		@Override
 		public String send() {
@@ -188,6 +208,7 @@ public class BinanceRestClient implements RestClient {
 			
 			return spotClient.createTrade().newOrder(parameters);
 		}
+
 	}
 
 }

@@ -8,6 +8,7 @@ import com.kucoin.sdk.KucoinPublicWSClient;
 import cz.amuradon.tralon.agent.connector.AccountBalance;
 import cz.amuradon.tralon.agent.connector.OrderBookChange;
 import cz.amuradon.tralon.agent.connector.OrderChange;
+import cz.amuradon.tralon.agent.connector.Trade;
 import cz.amuradon.tralon.agent.connector.WebsocketClient;
 import cz.amuradon.tralon.agent.connector.WebsocketClientFactory;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -42,6 +43,12 @@ public class KucoinWebsocketClient implements WebsocketClient {
 	@Override
 	public void onAccountBalance(Consumer<AccountBalance> callback) {
 		wsClientPrivate.onAccountBalance(e -> callback.accept(new KucoinAccountBalance(e.getData())));
+	}
+
+	@Override
+	public void onTrade(Consumer<Trade> callback, String symbol) {
+		wsClientPublic.onLevel3Data_V2(e -> callback.accept(new KucoinTrade(e.getData())), symbol);
+		
 	}
 
 }

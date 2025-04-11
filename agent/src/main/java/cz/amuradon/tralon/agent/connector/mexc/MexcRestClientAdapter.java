@@ -125,18 +125,21 @@ public class MexcRestClientAdapter implements RestClient {
 		private BigDecimal quantity;
 		private BigDecimal price;
     	
+		@Override
 		public NewOrderBuilder clientOrderId(String clientOrderId) {
 			params.put("newClientOrderId", clientOrderId);
 			signed = false;
 			return this;
 		}
 
+		@Override
 		public NewOrderBuilder side(Side side) {
     		params.put("side", side.name());
     		signed = false;
     		return this;
     	}
 
+		@Override
     	public NewOrderBuilder symbol(String symbol) {
     		params.put("symbol", symbol);
     		this.symbol = symbol;
@@ -144,42 +147,49 @@ public class MexcRestClientAdapter implements RestClient {
     		return this;
     	}
 
+		@Override
     	public NewOrderBuilder type(OrderType type) {
     		params.put("type", type.name());
     		signed = false;
     		return this;
     	}
     	
+		@Override
     	public NewOrderBuilder size(BigDecimal size) {
     		this.quantity = size;
     		signed = false;
     		return this;
     	}
    
+		@Override
     	public NewOrderBuilder price(BigDecimal price) {
     		this.price = price;
     		signed = false;
     		return this;
     	}
     	
+		@Override
     	public NewOrderBuilder timestamp(long timestamp) {
     		params.put(TIMESTAMP, String.valueOf(timestamp));
     		signed = false;
     		return this;
     	}
 
+		@Override
     	public NewOrderBuilder recvWindow(long timestamp) {
     		params.put("recvWindow", String.valueOf(timestamp));
     		signed = false;
     		return this;
     	}
 
+		@Override
     	public NewOrderBuilder signParams() {
     		params = signQueryParams(params);
     		signed = true;
     		return this;
     	}
     	
+		@Override
     	public String send() {
     		if (symbol == null) {
 				throw new IllegalArgumentException("Could not send order - symbol is missing.");

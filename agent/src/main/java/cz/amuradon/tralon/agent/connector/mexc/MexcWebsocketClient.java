@@ -1,23 +1,22 @@
 package cz.amuradon.tralon.agent.connector.mexc;
 
-import static cz.amuradon.tralon.agent.connector.RequestUtils.param;
-
 import java.io.IOException;
 import java.net.URI;
-import java.util.Date;
 import java.util.function.Consumer;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.InjectableValues;
+import com.fasterxml.jackson.databind.InjectableValues.Std;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import cz.amuradon.tralon.agent.connector.AccountBalance;
 import cz.amuradon.tralon.agent.connector.OrderBookChange;
 import cz.amuradon.tralon.agent.connector.OrderChange;
-import cz.amuradon.tralon.agent.connector.RequestUtils;
 import cz.amuradon.tralon.agent.connector.RestClient;
+import cz.amuradon.tralon.agent.connector.Trade;
 import cz.amuradon.tralon.agent.connector.WebsocketClient;
 import cz.amuradon.tralon.agent.connector.WebsocketClientFactory;
 import io.quarkus.logging.Log;
@@ -35,11 +34,13 @@ import jakarta.websocket.Session;
 @WebsocketClientFactory // Required for proper usage with Instance
 public class MexcWebsocketClient implements WebsocketClient {
 	
-	public static final String SPOT_DEPTH_UPDATES_CHANNEL_PREFIX = "spot@public.increase.depth.v3.api@";
+	private static final String SPOT_TRADE_UPDATES_CHANNEL_PREFIX = "spot@public.deals.v3.api@";
+	
+	private static final String SPOT_DEPTH_UPDATES_CHANNEL_PREFIX = "spot@public.increase.depth.v3.api@";
 
-	public static final String SPOT_ACCOUNT_UPDATES_CHANNEL = "spot@private.account.v3.api";
+	private static final String SPOT_ACCOUNT_UPDATES_CHANNEL = "spot@private.account.v3.api";
 
-	public static final String SPOT_ORDER_UPDATES_CHANNEL = "spot@private.orders.v3.api";
+	private static final String SPOT_ORDER_UPDATES_CHANNEL = "spot@private.orders.v3.api";
 
 	private final String baseUri;
 	
@@ -52,8 +53,12 @@ public class MexcWebsocketClient implements WebsocketClient {
 	private Consumer<OrderChange> orderChangeCallback;
 	
 	private Consumer<OrderBookChange> orderBookChangeCallback;
+
+	private Consumer<Trade> tradeCallback;
 	
 	private String depthUpdatesChannel;
+
+	private String tradeUpdatesChannel;
 	
 	private Session session;
 	
@@ -90,25 +95,33 @@ public class MexcWebsocketClient implements WebsocketClient {
 		}
 	}
 	
+	// TODO unit test unmarshalling
 	@OnMessage
 	public void onMessage(String message) {
 		try {
 			JsonNode tree = mapper.readTree(message);
 			JsonNode channelNode = tree.get("c");
+			JsonNode data = tree.get("d");
 			if (channelNode != null) {
 				String channel = channelNode.asText();
 				if (depthUpdatesChannel.equalsIgnoreCase(channel)) {
-					// TODO
-					orderBookChangeCallback.accept(null);
+					orderBookChangeCallback.accept(mapper.treeToValue(data, MexcOrderBookChange.class));
+				} else if (tradeUpdatesChannel.equalsIgnoreCase(channel)) {
+					MexcTradeEventData dealsData = mapper.treeToValue(data, MexcTradeEventData.class);
+					for (Trade trade : dealsData.deals()) {
+						tradeCallback.accept(trade);
+					}
 				} else if (SPOT_ACCOUNT_UPDATES_CHANNEL.equalsIgnoreCase(channel)) {
-					accountBalanceCallback.accept(null);
+					accountBalanceCallback.accept(mapper.treeToValue(data, MexcAccountBalanceUpdate.class));
 				} else if (SPOT_ORDER_UPDATES_CHANNEL.equalsIgnoreCase(channel)) {
-					orderChangeCallback.accept(null);
+					Std values = new InjectableValues.Std();
+					values.addValue("symbol", tree.get("s"));
+					orderChangeCallback.accept(mapper.readerFor(MexcOrderChange.class).with(values).readValue(data));
 				}
 			}
-		} catch (JsonProcessingException e) {
+		} catch (IOException e) {
 			Log.error("The Websocket client could not parse JSON.", e);
-		}
+		} 
 	}
 
 	@Override
@@ -125,7 +138,8 @@ public class MexcWebsocketClient implements WebsocketClient {
 		if (session == null) {
 			connect();
 		}
-		subscribe(SPOT_DEPTH_UPDATES_CHANNEL_PREFIX + symbol);
+		depthUpdatesChannel = SPOT_DEPTH_UPDATES_CHANNEL_PREFIX + symbol;
+		subscribe(depthUpdatesChannel);
 		orderBookChangeCallback = callback;
 	}
 
@@ -136,6 +150,16 @@ public class MexcWebsocketClient implements WebsocketClient {
 		}
 		subscribe(SPOT_ACCOUNT_UPDATES_CHANNEL);
 		accountBalanceCallback = callback;
+	}
+
+	@Override
+	public void onTrade(Consumer<Trade> callback, String symbol) {
+		if (session == null) {
+			connect();
+		}
+		tradeUpdatesChannel = SPOT_TRADE_UPDATES_CHANNEL_PREFIX + symbol; 
+		subscribe(tradeUpdatesChannel);
+		tradeCallback = callback;
 	}
 
 }

@@ -6,6 +6,7 @@ import java.util.Map;
 
 import cz.amuradon.tralon.agent.OrderType;
 import cz.amuradon.tralon.agent.Side;
+import cz.amuradon.tralon.agent.connector.RestClient.NewOrderBuilder;
 import cz.amuradon.tralon.agent.model.Order;
 
 public interface RestClient {
@@ -31,6 +32,9 @@ public interface RestClient {
 		NewOrderBuilder price(BigDecimal price);
 		NewOrderBuilder size(BigDecimal size);
 		NewOrderBuilder type(OrderType type);
+		NewOrderBuilder timestamp(long timestamp);
+    	NewOrderBuilder recvWindow(long recvWindow);
+    	NewOrderBuilder signParams();
 		String send();
 	}
 

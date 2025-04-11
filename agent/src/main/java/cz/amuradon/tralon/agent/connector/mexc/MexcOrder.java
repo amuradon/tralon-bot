@@ -1,4 +1,4 @@
-package cz.amuradon.tralon.agent.connector.binance;
+package cz.amuradon.tralon.agent.connector.mexc;
 
 import java.math.BigDecimal;
 
@@ -10,7 +10,7 @@ import cz.amuradon.tralon.agent.Side;
 import cz.amuradon.tralon.agent.model.Order;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class BinanceMexcOrder implements Order {
+public class MexcOrder implements Order {
 
 	private String orderId;
 	private String symbol;
@@ -19,7 +19,7 @@ public class BinanceMexcOrder implements Order {
 	private BigDecimal price;
 
 	@JsonCreator
-	public BinanceMexcOrder(@JsonProperty("orderId") String orderId,
+	public MexcOrder(@JsonProperty("orderId") String orderId,
 			@JsonProperty("symbol") String symbol,
 			@JsonProperty("origQty") BigDecimal origQty,
 			@JsonProperty("side") Side side,

@@ -9,6 +9,7 @@ public interface Strategy {
 	
 	void start();
 
+	// XXX These are not really required on interface!
 	void onOrderBookUpdate(OrderBookUpdate update, Map<BigDecimal, BigDecimal> orderBookSide);
 	
 	void onBaseBalanceUpdate(BigDecimal balance);

@@ -14,6 +14,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.amuradon.tralon.agent.connector.AccountBalance;
 import cz.amuradon.tralon.agent.connector.OrderBookChange;
 import cz.amuradon.tralon.agent.connector.OrderChange;
+import cz.amuradon.tralon.agent.connector.Trade;
 import cz.amuradon.tralon.agent.connector.WebsocketClient;
 import cz.amuradon.tralon.agent.connector.WebsocketClientFactory;
 import io.quarkus.logging.Log;
@@ -103,6 +104,21 @@ public class BinanceWebsocketClient implements WebsocketClient {
 			connected = connect();
 		}
 		accountBalanceCallback = callback;
+	}
+
+	@Override
+	public void onTrade(Consumer<Trade> callback, String symbol) {
+		if (!connected) {
+			connected = connect();
+		}
+		client.tradeStream(symbol, data -> {
+			try {
+				callback.accept(mapper.readValue(data, BinanaceTrade.class));
+			} catch (JsonProcessingException e) {
+				throw new IllegalStateException("Could not parse Websocket JSON", e);
+			}
+		});
+		
 	}
 
 }

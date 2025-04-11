@@ -1,4 +1,4 @@
-package cz.amuradon.tralon.agent.connector.binance;
+package cz.amuradon.tralon.agent.connector.mexc;
 
 import java.math.BigDecimal;
 
@@ -8,10 +8,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import cz.amuradon.tralon.agent.connector.AccountBalance;
 
 /**
- * Used for REST API response.
+ * Used for Websocket update message.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record BinanceMexcAccountBalance(@JsonProperty("asset") String asset,
-		@JsonProperty("free") BigDecimal available) implements AccountBalance {
+public record MexcAccountBalanceUpdate(@JsonProperty("a") String asset,
+		@JsonProperty("f") BigDecimal available) implements AccountBalance {
 
 }
