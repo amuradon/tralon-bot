@@ -1,11 +1,10 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
-	<groupId>cz.amuradon.tralon.cex-liquidity-mining-bot</groupId>
-	<artifactId>cex-liquidity-mining-agent</artifactId>
+	<groupId>cz.amuradon.tralon</groupId>
+	<artifactId>tralon-parent</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<packaging>jar</packaging>
+	<packaging>pom</packaging>
 
 	<properties>
 		<quarkus.platform.version>3.15.3</quarkus.platform.version>
@@ -21,16 +20,15 @@
 				<scope>import</scope>
 			</dependency>
 			<dependency>
-				<groupId>org.junit</groupId>
-				<artifactId>junit-bom</artifactId>
-				<version>5.11.4</version>
-				<type>pom</type>
-				<scope>import</scope>
-			</dependency>
+            	<groupId>org.junit</groupId>
+            	<artifactId>junit-bom</artifactId>
+            	<version>5.11.4</version>
+            	<type>pom</type>
+            	<scope>import</scope>
+        	</dependency>
 
 			<!-- Testing -->
-			<!-- JUnit 5.10.3 has to stay due to quarkus-junit and mockito-junit
-			transitive dependencies -->
+			<!-- JUnit 5.10.3 has to stay due to quarkus-junit and mockito-junit transitive dependencies -->
 			<dependency>
 				<groupId>org.junit.jupiter</groupId>
 				<artifactId>junit-jupiter-engine</artifactId>
@@ -40,89 +38,16 @@
 			<dependency>
 				<groupId>org.mockito</groupId>
 				<artifactId>mockito-junit-jupiter</artifactId>
-				<version>5.12.0</version>
+				<version>5.15.2</version>
 				<scope>test</scope>
 			</dependency>
 		</dependencies>
 	</dependencyManagement>
 
-	<dependencies>
-		<!-- Quarkus-->
-		<dependency>
-			<groupId>io.quarkus</groupId>
-			<artifactId>quarkus-arc</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>io.quarkus</groupId>
-			<artifactId>quarkus-vertx</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>io.quarkus</groupId>
-			<artifactId>quarkus-rest-client-jackson</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>io.quarkus</groupId>
-			<artifactId>quarkus-qute</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>io.quarkus</groupId>
-			<artifactId>quarkus-rest-qute</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>io.quarkiverse.qute.web</groupId>
-			<artifactId>quarkus-qute-web</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>io.quarkus</groupId>
-			<artifactId>quarkus-websockets-client</artifactId>
-		</dependency>
-		<dependency>
-		    <groupId>io.quarkus</groupId>
-		    <artifactId>quarkus-smallrye-fault-tolerance</artifactId>
-		</dependency>
-
-		<!-- Connectors -->
-		<dependency>
-			<groupId>com.kucoin</groupId>
-			<artifactId>kucoin-java-sdk</artifactId>
-			<version>1.0.15</version>
-		</dependency>
-		<dependency>
-			<groupId>io.github.binance</groupId>
-			<artifactId>binance-connector-java</artifactId>
-			<version>3.4.1</version>
-		</dependency>
-
-		<!-- Testing -->
-		<dependency>
-			<groupId>org.junit.jupiter</groupId>
-			<artifactId>junit-jupiter-api</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.junit.jupiter</groupId>
-			<artifactId>junit-jupiter-engine</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.mockito</groupId>
-			<artifactId>mockito-junit-jupiter</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>io.quarkus</groupId>
-			<artifactId>quarkus-junit5</artifactId>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>io.quarkus</groupId>
-			<artifactId>quarkus-junit5-mockito</artifactId>
-			<scope>test</scope>
-		</dependency>
-		<!-- managed version comes from quarkus-bom ?! -->
-		<dependency>
-			<groupId>io.fabric8</groupId>
-			<artifactId>mockwebserver</artifactId>
-			<scope>test</scope>
-		</dependency>
-	</dependencies>
+	<modules>
+		<module>agent</module>
+		<module>master</module>
+	</modules>
 
 	<build>
 		<plugins>
@@ -163,12 +88,10 @@
 					<version>3.5.2</version>
 					<configuration>
 						<systemPropertyVariables>
-							<java.util.logging.manager>
-								org.jboss.logmanager.LogManager</java.util.logging.manager>
-							<quarkus.log.level>DEBUG</quarkus.log.level>
+							<java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager> 
 							<maven.home>${env.M2_HOME}</maven.home>
 						</systemPropertyVariables>
-					</configuration>
+      				</configuration>
 				</plugin>
 			</plugins>
 		</pluginManagement>
@@ -198,5 +121,5 @@
 		</profile>
 	</profiles>
 
-
+	
 </project>
