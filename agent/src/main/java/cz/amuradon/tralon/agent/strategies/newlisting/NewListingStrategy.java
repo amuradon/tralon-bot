@@ -2,7 +2,6 @@ package cz.amuradon.tralon.agent.strategies.newlisting;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
@@ -18,8 +17,6 @@ import java.util.regex.Pattern;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import cz.amuradon.tralon.agent.OrderStatus;
 import cz.amuradon.tralon.agent.OrderType;
 import cz.amuradon.tralon.agent.Side;
@@ -32,7 +29,6 @@ import cz.amuradon.tralon.agent.connector.Trade;
 import cz.amuradon.tralon.agent.connector.WebsocketClient;
 import cz.amuradon.tralon.agent.strategies.Strategy;
 import io.quarkus.logging.Log;
-import jakarta.inject.Named;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
 
@@ -53,14 +49,13 @@ public class NewListingStrategy implements Strategy {
 	
 	private final ComputeInitialPrice computeInitialPrice;
 	
-    private final BigDecimal usdtVolume;
+    private final BigDecimal maxQuoteBalanceToUse;
     private final String symbol;
-    private final ObjectMapper mapper;
     
     private final int buyOrderRequestsPerSecond;
 	private final int buyOrderMaxAttempts;
     
-    private final Path dataDir;
+//    private final Path dataDir;
     
     private final int listingHour;
     
@@ -100,11 +95,10 @@ public class NewListingStrategy implements Strategy {
     		final RestClient restClient,
     		final WebsocketClient websocketClient,
     		final ComputeInitialPrice computeInitialPrice,
-    		@ConfigProperty(name = "mexc.secretKey") final String secretKey,
-    		@ConfigProperty(name = "usdtVolume") final String usdtVolume,
-    		@Named(BeanConfig.SYMBOL) final String symbol,
-    		@ConfigProperty(name = TIME_PROP_NAME) final String time,
-    		@Named(BeanConfig.DATA_DIR) final Path dataDir,
+    		final BigDecimal maxQuoteBalanceToUse,
+    		final String symbol,
+    		final LocalDateTime listingDateTime,
+//    		@Named(BeanConfig.DATA_DIR) final Path dataDir,
     		@ConfigProperty(name = "buyOrder.requestsPerSecond") final int buyOrderRequestsPerSecond,
     		@ConfigProperty(name = "buyOrder.maxAttempts") final int buyOrderMaxAttempts,
     		@ConfigProperty(name = "trailingStop.below") final int trailingStopBelow,
@@ -115,25 +109,17 @@ public class NewListingStrategy implements Strategy {
 		this.restClient = restClient;
 		this.websocketClient = websocketClient;
 		this.computeInitialPrice = computeInitialPrice;
-    	this.usdtVolume = new BigDecimal(usdtVolume);
+    	this.maxQuoteBalanceToUse = maxQuoteBalanceToUse;
     	this.symbol = symbol;
     	this.buyOrderRequestsPerSecond = buyOrderRequestsPerSecond;
     	this.buyOrderMaxAttempts = buyOrderMaxAttempts;
-    	this.dataDir = dataDir;
-    	this.mapper = new ObjectMapper();
+//    	this.dataDir = dataDir;
     	this.trailingStopBelow = trailingStopBelow;
 		this.trailingStopDelayMs = trailingStopDelayMs;
 		this.initialBuyOrderDelayMs = initialBuyOrderDelayMs;
     	
-    	String[] timeParts = time.split(":");
-    	if (timeParts.length >= 2) {
-    		listingHour = Integer.parseInt(timeParts[0]);
-    		listingMinute = Integer.parseInt(timeParts[1]);
-    	} else {
-    		throw new IllegalArgumentException(
-    				String.format("The property '%s' has invalid value '%s'. The expected format is HH:mm",
-    						TIME_PROP_NAME, time));
-    	}
+    	listingHour = listingDateTime.getHour();
+    	listingMinute = listingDateTime.getMinute();
     }
 	
 	@Override
@@ -268,7 +254,7 @@ public class NewListingStrategy implements Strategy {
 			.side(Side.BUY)
 			.type(OrderType.LIMIT)
 			// FIXME quantity je spocitana na tu max price!!! 
-			.size(usdtVolume.divide(price, 10, RoundingMode.HALF_UP))
+			.size(maxQuoteBalanceToUse.divide(price, 10, RoundingMode.HALF_UP))
 			.price(price)
 			.recvWindow(recvWindow)
 			.timestamp(timestamp)

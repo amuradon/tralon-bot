@@ -41,7 +41,7 @@ public class MarketMakingStrategy implements Strategy {
 	
     private final Map<Side, PriceProposal> priceProposals;
     
-	private final BigDecimal maxBalanceToUse;
+	private final BigDecimal maxQuoteBalanceToUse;
 	
 	private final ScheduledExecutorService scheduler;
 
@@ -66,7 +66,7 @@ public class MarketMakingStrategy implements Strategy {
     		final String quoteAsset,
     		final String symbol,
     		final int priceChangeDelayMs,
-    		final BigDecimal maxBalanceToUse,
+    		final BigDecimal maxQuoteBalanceToUse,
     		final ScheduledExecutorService scheduler,
     		final SpreadStrategy spreadCalculator) {
 		this.restClient = restClient;
@@ -75,7 +75,7 @@ public class MarketMakingStrategy implements Strategy {
 		this.quoteAsset = quoteAsset;
 		this.symbol = symbol;
 		this.priceChangeDelayMs = priceChangeDelayMs;
-		this.maxBalanceToUse = maxBalanceToUse;
+		this.maxQuoteBalanceToUse = maxQuoteBalanceToUse;
 		this.scheduler = scheduler;
 		this.orderBookManager = new OrderBookManager(restClient);
 		this.spreadCalculator = spreadCalculator;
@@ -247,7 +247,7 @@ public class MarketMakingStrategy implements Strategy {
 			BigDecimal bidPriceProposal = priceProposal.proposedPrice;
 			priceProposal.currentPrice = bidPriceProposal;
 			
-			BigDecimal balanceQuoteLeftForBids = maxBalanceToUse;
+			BigDecimal balanceQuoteLeftForBids = maxQuoteBalanceToUse;
 			for (Order order : orders.values()) {
 				balanceQuoteLeftForBids = balanceQuoteLeftForBids.subtract(order.price().multiply(order.size()));
 			}
@@ -302,6 +302,6 @@ public class MarketMakingStrategy implements Strategy {
 	public String getDescription() {
 		return String.format("%s - symbol: %s/%s, price change delay (ms): %d"
 				+ " , max balance to use: %s, spread: %",
-				getClass().getSimpleName(), baseAsset, quoteAsset, priceChangeDelayMs, maxBalanceToUse, spreadCalculator.describe());
+				getClass().getSimpleName(), baseAsset, quoteAsset, priceChangeDelayMs, maxQuoteBalanceToUse, spreadCalculator.describe());
 	}
 }

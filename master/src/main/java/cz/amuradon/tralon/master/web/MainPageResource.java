@@ -21,6 +21,8 @@ import cz.amuradon.tralon.agent.strategies.DualInvestmentSpotHedgeStrategy;
 import cz.amuradon.tralon.agent.strategies.Strategy;
 import cz.amuradon.tralon.agent.strategies.marketmaking.MarketMakingStrategy;
 import cz.amuradon.tralon.agent.strategies.marketmaking.SpreadStrategies;
+import cz.amuradon.tralon.agent.strategies.newlisting.ComputeInitialPrice;
+import cz.amuradon.tralon.agent.strategies.newlisting.NewListingStrategy;
 import io.quarkus.logging.Log;
 import io.quarkus.qute.CheckedTemplate;
 import io.quarkus.qute.TemplateInstance;
@@ -38,6 +40,7 @@ public class MainPageResource {
 
 	private static final String MARKET_MAKING = "Market Making";
 	private static final String SPOT_HEDGE = "Dual Investment Spot Hedge";
+	private static final String NEW_LISTING = "New Listing";
 
 	private final Map<String, Strategy> runningStrategies;
 	
@@ -64,7 +67,7 @@ public class MainPageResource {
 	@GET
 	@Produces(MediaType.TEXT_HTML)
 	public TemplateInstance index() {
-		return Templates.index(Arrays.asList(SPOT_HEDGE, MARKET_MAKING));
+		return Templates.index(Arrays.asList(SPOT_HEDGE, MARKET_MAKING, NEW_LISTING));
 	}
 
 	@GET
@@ -98,6 +101,8 @@ public class MainPageResource {
 		} else if (strategy.equalsIgnoreCase(MARKET_MAKING)) {
 			return Templates.marketMaking(supportedExchanges, Arrays.stream(SpreadStrategies.values())
 					.collect(Collectors.toMap(e -> e.displayName(), e -> e.valueCaption())));
+		} else if (strategy.equalsIgnoreCase(NEW_LISTING)) {
+			return Templates.newListing(supportedExchanges);
 		} else {
 			return Templates.noneStrategy();
 		}
@@ -120,13 +125,33 @@ public class MainPageResource {
 	@Produces(MediaType.TEXT_HTML)
 	public TemplateInstance runMarketMaking(@RestForm String exchangeName,
 			@RestForm String baseAsset, @RestForm String quoteAsset,
-			@RestForm BigDecimal baseQuantity,
+			@RestForm BigDecimal quoteQuantity,
 			@RestForm int priceChangeDelayMs,
 			@RestForm String spreadStrategy,
 			@RestForm BigDecimal spreadStrategyValue) {
 		return runStrategy(exchangeName, baseAsset, quoteAsset, (r, w, s) -> new MarketMakingStrategy(r, w, baseAsset,
-				quoteAsset, s, priceChangeDelayMs, baseQuantity, scheduler,
+				quoteAsset, s, priceChangeDelayMs, quoteQuantity, scheduler,
 				SpreadStrategies.fromDisplayName(spreadStrategy).create(spreadStrategyValue)));
+	}
+
+	// TODO extrahovat scheduling mimo strategii
+	@POST
+	@Path("/run-new-listing")
+	@Produces(MediaType.TEXT_HTML)
+	public TemplateInstance runNewListing(@RestForm String exchangeName,
+			@RestForm String baseAsset,
+			@RestForm String quoteAsset,
+			@RestForm BigDecimal quoteQuantity,
+			@RestForm String priceExpr,
+			@RestForm LocalDateTime listingDateTime,
+			@RestForm int buyOrderRequestsPerSecond,
+			@RestForm int buyOrderMaxAttempts,
+			@RestForm int trailingStopBelow,
+			@RestForm int trailingStopDelayMs,
+			@RestForm int initialBuyOrderValidityMs) {
+		return runStrategy(exchangeName, baseAsset, quoteAsset, (r, w, s) -> new NewListingStrategy(r, w,
+				new ComputeInitialPrice(priceExpr), quoteQuantity, s, listingDateTime, buyOrderRequestsPerSecond,
+				buyOrderMaxAttempts, trailingStopBelow, trailingStopDelayMs, initialBuyOrderValidityMs));
 	}
 	
 	/* TODO
@@ -167,6 +192,7 @@ public class MainPageResource {
 		public static native TemplateInstance runningStrategies(Map<String, Strategy> runningStrategies);
 		public static native TemplateInstance dualInvestmentSpotHedge(List<String> exchanges);
 		public static native TemplateInstance marketMaking(List<String> exchanges, Map<String, String> spreadStrategies);
+		public static native TemplateInstance newListing(List<String> exchanges);
 		public static native TemplateInstance noneStrategy();
 	}
 	

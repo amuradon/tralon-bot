@@ -3,8 +3,6 @@ package cz.amuradon.tralon.connector.mexc;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
-import java.io.IOException;
-
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,7 +18,6 @@ import org.mockito.quality.Strictness;
 import cz.amuradon.tralon.agent.connector.RestClient;
 import cz.amuradon.tralon.agent.connector.mexc.MexcWebsocketClient;
 import jakarta.websocket.ContainerProvider;
-import jakarta.websocket.DeploymentException;
 import jakarta.websocket.RemoteEndpoint.Basic;
 import jakarta.websocket.Session;
 import jakarta.websocket.WebSocketContainer;

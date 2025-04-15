@@ -1,0 +1,47 @@
+{@java.lang.String[] exchanges}
+
+<h3>Dual Investment Spot Hedge Strategy</h3>
+<form hx-target="#runningStrategies" hx-post="/run-spot-hedge">
+	<label for="exchangeName">Exchange Name:</label>
+	<select name="exchangeName">
+	  {#for name in exchanges}
+		<option value="{name}">{name}</option>
+	  {/for}
+	</select>
+	
+	<label for="endDateTime">End date time:</label>
+	<input name="endDateTime" type="datetime-local"/>
+	
+	<label for="baseAsset">Base Asset:</label>
+	<input name="baseAsset" type="text"/>
+	
+	<label for="quoteAsset">Quote Asset:</label>
+	<input name="quoteAsset" type="text" value="USDT"/>
+
+	<label for="priceExpr">Price expression:</label>
+	<input name="priceExpr" type="text"/>
+	
+	<label for="baseQuantity">Base Quantity:</label>
+	<input name="baseQuantity" type="number"/>
+
+	<label for="listingDateTime">Listing start:</label>
+	<input name="listingDateTime" type="datetime-local"/>
+	
+	<label for="requestsPerSecond">Retry requests per second:</label>
+	<input name="requestsPerSecond" type="number" />
+
+	<label for="buyOrderMaxAttempts">Max retries:</label>
+	<input name="buyOrderMaxAttempts" type="number" />
+	
+	<label for="trailingStopBelow">Trailing stop below max price (%):</label>
+	<input name="trailingStopBelow" type="number" />
+	
+	<label for="trailingStopDelayMs">Trailing stop execution delay (ms):</label>
+	<input name="trailingStopDelayMs" type="number" />
+	
+	<label for="initialBuyOrderValidityMs">Validity interval of initial buy order (ms):</label>
+	<input name="initialBuyOrderValidityMs" type="number" />
+	
+	<br/>
+	<input type="submit" value="Run" />
+</form>

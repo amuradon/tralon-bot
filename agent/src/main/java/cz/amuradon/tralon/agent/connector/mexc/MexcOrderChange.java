@@ -1,13 +1,10 @@
 package cz.amuradon.tralon.agent.connector.mexc;
 
 import java.math.BigDecimal;
-import java.util.Objects;
 
 import com.fasterxml.jackson.annotation.JacksonInject;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.base.MoreObjects;
-import com.google.common.base.MoreObjects.ToStringHelper;
 
 import cz.amuradon.tralon.agent.OrderStatus;
 import cz.amuradon.tralon.agent.connector.OrderChange;
