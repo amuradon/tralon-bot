@@ -16,13 +16,14 @@ public record BinanceOrderChange(
 		@JsonProperty("X") OrderStatus status,
 		@JsonProperty("s") String symbol,
 		@JsonProperty("i") String orderId,
+		@JsonProperty("c") String clientOrderId,
 		@JsonProperty("S") String side,
-		@JsonProperty("q") BigDecimal size,
+		@JsonProperty("q") BigDecimal quantity,
 		@JsonProperty("p") BigDecimal price,
-		@JsonProperty("z") BigDecimal cumulativeFilledQuantity) implements OrderChange {
+		@JsonProperty("z") BigDecimal cumulativeQuantity) implements OrderChange {
 
 	@Override
-	public BigDecimal remainSize() {
-		return size.subtract(cumulativeFilledQuantity);
+	public BigDecimal remainingQuantity() {
+		return quantity.subtract(cumulativeQuantity);
 	}
 }

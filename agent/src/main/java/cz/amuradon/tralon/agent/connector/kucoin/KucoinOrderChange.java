@@ -40,6 +40,11 @@ public class KucoinOrderChange implements OrderChange {
 	public String orderId() {
 		return data.getOrderId();
 	}
+	
+	@Override
+	public String clientOrderId() {
+		return data.getClientOid();
+	}
 
 	@Override
 	public String side() {
@@ -47,8 +52,13 @@ public class KucoinOrderChange implements OrderChange {
 	}
 
 	@Override
-	public BigDecimal size() {
+	public BigDecimal quantity() {
 		return data.getSize();
+	}
+	
+	@Override
+	public BigDecimal cumulativeQuantity() {
+		return data.getFilledSize();
 	}
 
 	@Override
@@ -57,7 +67,7 @@ public class KucoinOrderChange implements OrderChange {
 	}
 
 	@Override
-	public BigDecimal remainSize() {
+	public BigDecimal remainingQuantity() {
 		return data.getRemainSize();
 	}
 

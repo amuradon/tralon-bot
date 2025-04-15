@@ -1,18 +1,13 @@
 package cz.amuradon.tralon.agent.strategies.newlisting;
 
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.HexFormat;
-import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -23,28 +18,19 @@ import java.util.regex.Pattern;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonMappingException;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import cz.amuradon.tralon.agent.OrderBook;
+import cz.amuradon.tralon.agent.OrderStatus;
 import cz.amuradon.tralon.agent.OrderType;
 import cz.amuradon.tralon.agent.Side;
-import cz.amuradon.tralon.agent.connector.ListenKey;
 import cz.amuradon.tralon.agent.connector.OrderBookResponse;
 import cz.amuradon.tralon.agent.connector.OrderBookUpdate;
 import cz.amuradon.tralon.agent.connector.OrderChange;
 import cz.amuradon.tralon.agent.connector.RestClient;
+import cz.amuradon.tralon.agent.connector.SymbolInfo;
 import cz.amuradon.tralon.agent.connector.Trade;
 import cz.amuradon.tralon.agent.connector.WebsocketClient;
-import cz.amuradon.tralon.agent.connector.mexc.ExchangeInfo;
-import cz.amuradon.tralon.agent.connector.mexc.MexcClient;
-import cz.amuradon.tralon.agent.connector.mexc.OrderResponse;
-import cz.amuradon.tralon.agent.connector.mexc.SymbolInfo;
 import cz.amuradon.tralon.agent.strategies.Strategy;
-import cz.amuradon.tralon.agent.strategies.newlisting.RequestBuilder.NewOrderRequestBuilder;
 import io.quarkus.logging.Log;
 import jakarta.inject.Named;
 import jakarta.ws.rs.WebApplicationException;
@@ -106,7 +92,7 @@ public class NewListingStrategy implements Strategy {
 	
 	private String buyClientOrderId;
 	
-	private int priceScale;
+	private SymbolInfo symbolInfo;
 	
 	private BigDecimal initialBuyPrice;
     
@@ -229,9 +215,7 @@ public class NewListingStrategy implements Strategy {
 		 */
 		
 		// subscribe updates
-		long timestamp = new Date().getTime();
-		
-		String listenKey = restClient.userDataStream();
+		symbolInfo = restClient.cacheSymbolDetails(symbol);
 		websocketClient.onTrade(this::processTradeUpdate, symbol);
 		websocketClient.onOrderChange(this::processOrderUpdate);
 		
@@ -248,15 +232,15 @@ public class NewListingStrategy implements Strategy {
 //		}
 		
 
-		try {
+//		try {
 //			ExchangeInfo exchangeInfo = mapper.readValue(exchangeInfoJson, ExchangeInfo.class);
 //			OrderBook orderBook = mapper.readValue(orderBookJson, OrderBook.class);
 			
 			initialBuyPrice = computeInitialPrice.execute(symbol, orderBookResponse);
 			Log.infof("Computed buy limit order price: %s", initialBuyPrice);
-		} catch (JsonProcessingException e) {
-			throw new IllegalStateException("JSON could not be parsed", e);
-		}
+//		} catch (JsonProcessingException e) {
+//			throw new IllegalStateException("JSON could not be parsed", e);
+//		}
 		
 		// XXX temporary testing
 //		placeNewBuyOrder();
@@ -341,7 +325,7 @@ public class NewListingStrategy implements Strategy {
 			if (price.compareTo(maxPrice) > 0) {
 				maxPrice = trade.price();
 				stopPrice = maxPrice.multiply(new BigDecimal(100 - trailingStopBelow))
-						.divide(new BigDecimal(100), dataHolder.getPriceScale(), RoundingMode.DOWN);
+						.divide(new BigDecimal(100), symbolInfo.priceScale(), RoundingMode.DOWN);
 			}
 			
 			// Caution: market order does not work in first (one?) minute, it is immediately cancelled
@@ -353,7 +337,7 @@ public class NewListingStrategy implements Strategy {
 						.type(OrderType.LIMIT)
 						.size(baseQuantity)
 						// Emulate market order to set lowest possible limit price
-						.price(BigDecimal.ONE.scaleByPowerOfTen(dataHolder.getPriceScale()))
+						.price(BigDecimal.ONE.scaleByPowerOfTen(symbolInfo.priceScale()))
 						.send();
 					positionOpened = false;
 				} else {
@@ -365,10 +349,10 @@ public class NewListingStrategy implements Strategy {
 			
 			// If there is still at least partial of initial buy order
 			if (initialBuyValid) {
-				if (trade.price().compareTo(dataHolder.getInitialBuyPrice()) > 0) {
+				if (trade.price().compareTo(initialBuyPrice) > 0) {
 					buyOrderPriceOverTimestamp = Math.min(buyOrderPriceOverTimestamp, trade.timestamp());
 					if (System.currentTimeMillis() - buyOrderPriceOverTimestamp > initialBuyOrderDelayMs) {
-						requestBuilder.cancelOrder(symbol, dataHolder.getBuyOrderId());
+						restClient.cancelOrder(buyOrderId, symbol);
 						initialBuyValid = false;
 					}
 				} else {
@@ -378,17 +362,17 @@ public class NewListingStrategy implements Strategy {
 		}
 	}
 	
-	private void processOrderUpdate(OrderChange orderChange) throws JsonMappingException, JsonProcessingException {
+	private void processOrderUpdate(OrderChange orderChange) {
 		
-		if (orderChange.clientOrderId().equalsIgnoreCase(dataHolder.getBuyClientOrderId())){
-			if (orderChange.status() == Status.PARTIALLY_TRADED) {
+		if (orderChange.clientOrderId().equalsIgnoreCase(buyClientOrderId)){
+			if (orderChange.status() == OrderStatus.PARTIALLY_FILLED) {
 				positionOpened = true;
-				baseQuantity = orderChange.cumulativeQuantityBase();
-			} else if (orderChange.status() == Status.FULLY_TRADED) {
+				baseQuantity = orderChange.cumulativeQuantity();
+			} else if (orderChange.status() == OrderStatus.FILLED) {
 				positionOpened = true;
 				initialBuyValid = false;
-				baseQuantity = orderChange.cumulativeQuantityBase();
-			} else if (orderChange.status() == Status.PARTIALLY_CANCELLED) {
+				baseQuantity = orderChange.cumulativeQuantity();
+			} else if (orderChange.status() == OrderStatus.CANCELED) {
 				initialBuyValid = false;
 			}
 		 }

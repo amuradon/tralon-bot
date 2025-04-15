@@ -142,14 +142,14 @@ public class MarketMakingStrategy implements Strategy {
     		if (orderStatus == OrderStatus.NEW) {
     			orders.put(data.orderId(), 
     					new OrderImpl(data.orderId(), data.symbol(),
-    							Side.getValue(data.side()), data.size(), data.price()));
+    							Side.getValue(data.side()), data.quantity(), data.price()));
     		} else if (orderStatus == OrderStatus.FILLED) {
     			orders.remove(data.orderId());
     		} else if (orderStatus == OrderStatus.CANCELED) {
     			// The orders are removed immediately once cancelled, this is to cover manual cancel
     			orders.remove(data.orderId());
     		} else if (orderStatus == OrderStatus.PARTIALLY_FILLED) {
-    			orders.get(data.orderId()).size(data.remainSize());
+    			orders.get(data.orderId()).size(data.remainingQuantity());
     		}
     	}
 		Log.infof("Order change: %s, ID: %s", data.orderId(), orderStatus);
@@ -286,7 +286,7 @@ public class MarketMakingStrategy implements Strategy {
         	Order order = entry.getValue();
         	if (side == order.side() && order.price().compareTo(proposedPrice) != 0) {
     			Log.infof("Cancelling order %s", order);
-				restClient.cancelOrder(order);
+				restClient.cancelOrder(order.orderId(), order.symbol());
         	} else {
         		ordersBeKept.put(entry.getKey(), order);
         	}

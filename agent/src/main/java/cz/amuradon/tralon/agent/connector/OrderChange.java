@@ -11,13 +11,17 @@ public interface OrderChange {
 	String symbol();
 
 	String orderId();
+	
+	String clientOrderId();
 
 	String side();
 
-	BigDecimal size();
+	BigDecimal quantity();
 
 	BigDecimal price();
 
-	BigDecimal remainSize();
+	BigDecimal remainingQuantity();
+	
+	BigDecimal cumulativeQuantity();
 
 }

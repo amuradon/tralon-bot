@@ -60,11 +60,11 @@ public class MexcRestClientAdapter implements RestClient {
 	}
 	
 	@Override
-	public void cancelOrder(Order order) {
+	public void cancelOrder(String orderId, String symbol) {
     	mexcClient.cancelOrder(
     			param("timestamp", new Date().getTime())
-    			.param("symbol", order.symbol())
-    			.param("orderId", order.orderId()));
+    			.param("symbol", symbol)
+    			.param("orderId", orderId));
 	}
 
 	@Override
@@ -84,16 +84,18 @@ public class MexcRestClientAdapter implements RestClient {
 	}
 
 	@Override
-	public void cacheSymbolDetails(String symbol) {
+	public cz.amuradon.tralon.agent.connector.SymbolInfo cacheSymbolDetails(String symbol) {
 		if (priceScales.get(symbol) != null && quantityScales.get(symbol) != null) {
-			return;
+			return new cz.amuradon.tralon.agent.connector.SymbolInfo(priceScales.get(symbol));
 		}
 		
 		ExchangeInfo exchnageInfo = mexcClient.exchangeInfo(symbol);
 		SymbolInfo symbolInfo = exchnageInfo.symbols().get(0);
 		
 		quantityScales.put(symbol, symbolInfo.baseSizePrecision().stripTrailingZeros().scale());
-		priceScales.put(symbol, symbolInfo.quoteAssetPrecision());
+		int priceScale = symbolInfo.quoteAssetPrecision();
+		priceScales.put(symbol, priceScale);
+		return new cz.amuradon.tralon.agent.connector.SymbolInfo(priceScale);
 	}
 
 	@Override

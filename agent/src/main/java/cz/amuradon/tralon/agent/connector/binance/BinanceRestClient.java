@@ -24,7 +24,6 @@ import cz.amuradon.tralon.agent.connector.OrderBookResponse;
 import cz.amuradon.tralon.agent.connector.OrderBookResponseImpl;
 import cz.amuradon.tralon.agent.connector.RestClient;
 import cz.amuradon.tralon.agent.connector.RestClientFactory;
-import cz.amuradon.tralon.agent.connector.RestClient.NewOrderBuilder;
 import cz.amuradon.tralon.agent.model.Order;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -56,9 +55,9 @@ public class BinanceRestClient implements RestClient {
 	}
 
 	@Override
-	public void cancelOrder(Order order) {
+	public void cancelOrder(String orderId, String symbol) {
 		spotClient.createTrade()
-			.cancelOrder(param("symbol", order.symbol()).param("orderId", order.orderId()));
+			.cancelOrder(param("symbol", symbol).param("orderId", orderId));
 	}
 
 	@Override
@@ -95,25 +94,28 @@ public class BinanceRestClient implements RestClient {
 	}
 	
 	@Override
-	public void cacheSymbolDetails(String symbol) {
+	public cz.amuradon.tralon.agent.connector.SymbolInfo cacheSymbolDetails(String symbol) {
 		if (priceScales.get(symbol) != null && quantityScales.get(symbol) != null) {
-			return;
+			return new cz.amuradon.tralon.agent.connector.SymbolInfo(priceScales.get(symbol));
 		}
 
 		try {
 			String response = spotClient.createMarket().exchangeInfo(param("symbol", symbol));
 			ExchangeInfo exchangeInfo = mapper.readValue(response, ExchangeInfo.class);
+			int priceScale = 0;
 			for (SymbolInfo symbolInfo : exchangeInfo.symbols()) {
 				if (symbol.equalsIgnoreCase(symbolInfo.symbol())) {
 					for (Filter filter : symbolInfo.filters())
 						if ("LOT_SIZE".equalsIgnoreCase(filter.filterType)) {
 							quantityScales.put(symbol, new BigDecimal(filter.get("stepSize")).stripTrailingZeros().scale());
 						} else if ("PRICE_FILTER".equalsIgnoreCase(filter.filterType)) {
-							priceScales.put(symbol, new BigDecimal(filter.get("tickSize")).stripTrailingZeros().scale());
+							priceScale = new BigDecimal(filter.get("tickSize")).stripTrailingZeros().scale();
+							priceScales.put(symbol, priceScale);
 						}
 					break;
 				}
 			}
+			return new cz.amuradon.tralon.agent.connector.SymbolInfo(priceScale);
 		} catch (JsonProcessingException e) {
 			throw new IllegalStateException("Could not read exchange info.", e);
 		}

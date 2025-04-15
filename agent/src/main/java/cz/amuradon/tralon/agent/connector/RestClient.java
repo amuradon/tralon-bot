@@ -6,12 +6,11 @@ import java.util.Map;
 
 import cz.amuradon.tralon.agent.OrderType;
 import cz.amuradon.tralon.agent.Side;
-import cz.amuradon.tralon.agent.connector.RestClient.NewOrderBuilder;
 import cz.amuradon.tralon.agent.model.Order;
 
 public interface RestClient {
 
-	void cancelOrder(Order order);
+	void cancelOrder(String orderId, String symbol);
 	
 	Map<String, Order> listOrders(String symbol);
 	
@@ -19,7 +18,7 @@ public interface RestClient {
 			
 	OrderBookResponse orderBook(String symbol);
 
-	void cacheSymbolDetails(String symbol);
+	SymbolInfo cacheSymbolDetails(String symbol);
 	
 	NewOrderBuilder newOrder();
 

@@ -11,4 +11,5 @@ public enum OrderStatus {
 	REJECTED,
 	EXPIRED,
 	EXPIRED_IN_MATCH;
+	
 }

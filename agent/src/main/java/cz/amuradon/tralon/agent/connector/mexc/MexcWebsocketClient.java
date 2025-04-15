@@ -6,7 +6,6 @@ import java.util.function.Consumer;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.InjectableValues;
 import com.fasterxml.jackson.databind.InjectableValues.Std;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -56,9 +55,9 @@ public class MexcWebsocketClient implements WebsocketClient {
 
 	private Consumer<Trade> tradeCallback;
 	
-	private String depthUpdatesChannel;
+	private String depthUpdatesChannel = "";
 
-	private String tradeUpdatesChannel;
+	private String tradeUpdatesChannel = "";
 	
 	private Session session;
 	
@@ -115,7 +114,7 @@ public class MexcWebsocketClient implements WebsocketClient {
 					accountBalanceCallback.accept(mapper.treeToValue(data, MexcAccountBalanceUpdate.class));
 				} else if (SPOT_ORDER_UPDATES_CHANNEL.equalsIgnoreCase(channel)) {
 					Std values = new InjectableValues.Std();
-					values.addValue("symbol", tree.get("s"));
+					values.addValue("symbol", tree.get("s").asText());
 					orderChangeCallback.accept(mapper.readerFor(MexcOrderChange.class).with(values).readValue(data));
 				}
 			}

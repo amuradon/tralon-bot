@@ -19,7 +19,7 @@ import cz.amuradon.tralon.agent.connector.OrderBookResponse;
 import cz.amuradon.tralon.agent.connector.OrderBookResponseImpl;
 import cz.amuradon.tralon.agent.connector.RestClient;
 import cz.amuradon.tralon.agent.connector.RestClientFactory;
-import cz.amuradon.tralon.agent.connector.RestClient.NewOrderBuilder;
+import cz.amuradon.tralon.agent.connector.SymbolInfo;
 import cz.amuradon.tralon.agent.model.Order;
 import cz.amuradon.tralon.agent.model.OrderImpl;
 import io.quarkus.logging.Log;
@@ -49,9 +49,9 @@ public class KucoinRestClient implements RestClient {
 	}
 	
 	@Override
-	public void cancelOrder(Order order) {
+	public void cancelOrder(String orderId, String symbol) {
 		try {
-			restClient.orderAPI().cancelOrder(order.orderId());
+			restClient.orderAPI().cancelOrder(orderId);
 		} catch (IOException e) {
 			throw new IllegalStateException("Could not send cancel order request.", e);
 		}
@@ -90,15 +90,17 @@ public class KucoinRestClient implements RestClient {
 	}
 	
 	@Override
-	public void cacheSymbolDetails(String symbol) {
+	public SymbolInfo cacheSymbolDetails(String symbol) {
 		if (priceScales.get(symbol) != null && sizeScales.get(symbol) != null) {
-			return;
+			return new SymbolInfo(priceScales.get(symbol));
 		}
 
 		try {
 			SymbolResponse symbolDetails = restClient.symbolAPI().getSymbolDetail(symbol);
-			priceScales.put(symbol, symbolDetails.getPriceIncrement().stripTrailingZeros().scale());
+			int priceScale = symbolDetails.getPriceIncrement().stripTrailingZeros().scale();
+			priceScales.put(symbol, priceScale);
 			sizeScales.put(symbol, symbolDetails.getBaseIncrement().stripTrailingZeros().scale());
+			return new SymbolInfo(priceScale);
 		} catch (IOException e) {
 			throw new IllegalStateException("Could not get symbol details.", e);
 		}
