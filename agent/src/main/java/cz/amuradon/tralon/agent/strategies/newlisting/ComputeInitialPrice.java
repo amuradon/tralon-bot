@@ -5,8 +5,6 @@ import java.math.RoundingMode;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.eclipse.microprofile.config.inject.ConfigProperty;
-
 import cz.amuradon.tralon.agent.connector.OrderBookResponse;
 import io.quarkus.logging.Log;
 
@@ -15,13 +13,9 @@ import io.quarkus.logging.Log;
 // ^^^ Neni to prilis omezujici? Jestli ten "String programming" neni flexibilnejsi, ale i chybovejsi?
 public class ComputeInitialPrice {
 
-	public static final String BUY_ORDER_LIMIT_PRICE_PROP_NAME = "buyOrder.price";
-
-	public static final String BEAN_NAME = "computeInitialPrice";
-	
 	private final String buyOrderPriceProperty;
 	
-	public ComputeInitialPrice(@ConfigProperty(name = BUY_ORDER_LIMIT_PRICE_PROP_NAME) final String buyOrderPriceProperty) {
+	public ComputeInitialPrice(final String buyOrderPriceProperty) {
 		this.buyOrderPriceProperty = buyOrderPriceProperty;
 	}
 	
@@ -60,8 +54,8 @@ public class ComputeInitialPrice {
 			return new BigDecimal(extractValue(buyOrderPriceProperty));
 		} else {
 			if (!buyOrderPriceProperty.equalsIgnoreCase("auto")) {
-				Log.errorf("The property '%s' has invalid value '%s'. Defaulting to 'auto'",
-						BUY_ORDER_LIMIT_PRICE_PROP_NAME, buyOrderPriceProperty);
+				Log.errorf("The 'Price Expression' has invalid value '%s'. Defaulting to 'auto'",
+						buyOrderPriceProperty);
 			}
 			// TODO auto-computation
 			return BigDecimal.ZERO;
