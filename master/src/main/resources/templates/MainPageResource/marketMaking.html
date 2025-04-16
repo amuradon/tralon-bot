@@ -2,7 +2,7 @@
 {@java.util.Map<String, String> spreadStrategies}
 
 <h3>Market Making Strategy</h3>
-<form hx-target="#runningStrategies" hx-post="/run-market-making">
+<form hx-target="#runningStrategies" hx-post="/run-market-making" hx-target-error="#errors">
 	<label for="exchangeName">Exchange Name:</label>
 	<select name="exchangeName">
 	  {#for name in exchanges}

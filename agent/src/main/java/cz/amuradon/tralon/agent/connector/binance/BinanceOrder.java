@@ -22,12 +22,12 @@ public class BinanceOrder implements Order {
 	public BinanceOrder(@JsonProperty("orderId") String orderId,
 			@JsonProperty("symbol") String symbol,
 			@JsonProperty("origQty") BigDecimal origQty,
-			@JsonProperty("side") Side side,
+			@JsonProperty("side") String side,
 			@JsonProperty("price") BigDecimal price) {
 		this.orderId = orderId;
 		this.symbol = symbol;
 		this.origQty = origQty;
-		this.side = side;
+		this.side = Side.valueOf(side);
 		this.price = price;
 	}
 	

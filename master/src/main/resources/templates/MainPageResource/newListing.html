@@ -1,16 +1,13 @@
 {@java.lang.String[] exchanges}
 
 <h3>Dual Investment Spot Hedge Strategy</h3>
-<form hx-target="#runningStrategies" hx-post="/run-spot-hedge">
+<form hx-target="#runningStrategies" hx-post="/run-new-listing" hx-target-error="#errors">
 	<label for="exchangeName">Exchange Name:</label>
 	<select name="exchangeName">
 	  {#for name in exchanges}
 		<option value="{name}">{name}</option>
 	  {/for}
 	</select>
-	
-	<label for="endDateTime">End date time:</label>
-	<input name="endDateTime" type="datetime-local"/>
 	
 	<label for="baseAsset">Base Asset:</label>
 	<input name="baseAsset" type="text"/>

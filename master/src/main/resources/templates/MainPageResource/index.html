@@ -7,9 +7,10 @@
   <title>Tralon</title>
   <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css">
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <script src="https://unpkg.com/htmx-ext-response-targets@2.0.2"></script>
   <script src="https://unpkg.com/hyperscript.org@0.9.14"></script>
 </head>
-<body>
+<body hx-ext="response-targets">
 <h1>Tralon</h1>
 <h4>Running strategies</h4>
 <div id="runningStrategies" hx-get="/get-running" hx-trigger="load">
@@ -26,5 +27,6 @@
 <div id="strategyConfig" hx-post="/choose-strategy" hx-trigger="load" hx-include="#strategy">
 <!-- To be replaced by the result of call on load -->
 </div>
+<div id="errors"></div>
 </body>
 </html>

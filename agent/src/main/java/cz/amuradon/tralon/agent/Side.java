@@ -26,4 +26,5 @@ public enum Side {
 	public int value() {
 		return ordinal() + 1;
 	}
+
 }

@@ -99,11 +99,11 @@ public class NewListingStrategy implements Strategy {
     		final String symbol,
     		final LocalDateTime listingDateTime,
 //    		@Named(BeanConfig.DATA_DIR) final Path dataDir,
-    		@ConfigProperty(name = "buyOrder.requestsPerSecond") final int buyOrderRequestsPerSecond,
-    		@ConfigProperty(name = "buyOrder.maxAttempts") final int buyOrderMaxAttempts,
-    		@ConfigProperty(name = "trailingStop.below") final int trailingStopBelow,
-			@ConfigProperty(name = "trailingStop.delayMs") final int trailingStopDelayMs,
-			@ConfigProperty(name = "initialBuyOrder.delayMs") final int initialBuyOrderDelayMs) {
+    		final int buyOrderRequestsPerSecond,
+    		final int buyOrderMaxAttempts,
+    		final int trailingStopBelow,
+			final int trailingStopDelayMs,
+			final int initialBuyOrderDelayMs) {
     	
 		scheduler = Executors.newScheduledThreadPool(2);
 		this.restClient = restClient;
