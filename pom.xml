@@ -7,39 +7,23 @@
 	<packaging>pom</packaging>
 
 	<properties>
-		<quarkus.platform.version>3.15.3</quarkus.platform.version>
+		<quarkus.platform.version>3.21.3</quarkus.platform.version>
 	</properties>
 
 	<dependencyManagement>
 		<dependencies>
+			<!-- 
+				The Quarkus BOM contains also
+				* JUnit5
+				* Mockito
+				* io.fabric8.mockwebserver
+			-->
 			<dependency>
 				<groupId>io.quarkus.platform</groupId>
 				<artifactId>quarkus-bom</artifactId>
 				<version>${quarkus.platform.version}</version>
 				<type>pom</type>
 				<scope>import</scope>
-			</dependency>
-			<dependency>
-            	<groupId>org.junit</groupId>
-            	<artifactId>junit-bom</artifactId>
-            	<version>5.11.4</version>
-            	<type>pom</type>
-            	<scope>import</scope>
-        	</dependency>
-
-			<!-- Testing -->
-			<!-- JUnit 5.10.3 has to stay due to quarkus-junit and mockito-junit transitive dependencies -->
-			<dependency>
-				<groupId>org.junit.jupiter</groupId>
-				<artifactId>junit-jupiter-engine</artifactId>
-				<version>5.10.3</version>
-				<scope>test</scope>
-			</dependency>
-			<dependency>
-				<groupId>org.mockito</groupId>
-				<artifactId>mockito-junit-jupiter</artifactId>
-				<version>5.15.2</version>
-				<scope>test</scope>
 			</dependency>
 		</dependencies>
 	</dependencyManagement>

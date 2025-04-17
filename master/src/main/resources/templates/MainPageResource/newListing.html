@@ -18,8 +18,8 @@
 	<label for="priceExpr">Price expression:</label>
 	<input name="priceExpr" type="text"/>
 	
-	<label for="baseQuantity">Base Quantity:</label>
-	<input name="baseQuantity" type="number"/>
+	<label for="quoteQuantity" title="Usually USDT">Quote Quantity:</label>
+	<input name="quoteQuantity" type="number" step="any"/>
 
 	<label for="listingDateTime">Listing start:</label>
 	<input name="listingDateTime" type="datetime-local"/>
@@ -31,7 +31,7 @@
 	<input name="buyOrderMaxAttempts" type="number" />
 	
 	<label for="trailingStopBelow">Trailing stop below max price (%):</label>
-	<input name="trailingStopBelow" type="number" />
+	<input name="trailingStopBelow" type="number" step="any" />
 	
 	<label for="trailingStopDelayMs">Trailing stop execution delay (ms):</label>
 	<input name="trailingStopDelayMs" type="number" />

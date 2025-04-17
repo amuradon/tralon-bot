@@ -1,4 +1,4 @@
-package cz.amuradon.tralon.connector.mexc;
+package cz.amuradon.tralon.agent.connector.mexc;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;

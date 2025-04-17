@@ -86,7 +86,7 @@ public class BinanceRestClient implements RestClient {
 		try {
 			String response = spotClient.createMarket().depth(param("symbol", symbol).param("limit", 5000));
 			BinanceOrderBookResponse orderBookResponse = mapper.readValue(response, BinanceOrderBookResponse.class);
-			return new OrderBookResponseImpl(orderBookResponse.sequence(),
+			return new OrderBookResponseImpl(orderBookResponse.lastUpdateId(),
 					orderBookResponse.asks(), orderBookResponse.bids());
 		} catch (JsonProcessingException e) {
 			throw new IllegalStateException("Could not read order book.", e);

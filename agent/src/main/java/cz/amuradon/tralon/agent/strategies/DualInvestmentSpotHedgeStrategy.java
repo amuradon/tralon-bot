@@ -46,24 +46,6 @@ public class DualInvestmentSpotHedgeStrategy implements Strategy {
 	}
 	
 	@Override
-	public void onOrderBookUpdate(OrderBookUpdate update, Map<BigDecimal, BigDecimal> orderBookSide) {
-		// Do nothing, not needed
-
-	}
-
-	@Override
-	public void onBaseBalanceUpdate(BigDecimal balance) {
-		// TODO Need to track?
-
-	}
-
-	@Override
-	public void onQuoteBalanceUpdate(BigDecimal balance) {
-		// TODO Need to track?
-
-	}
-
-	@Override
 	public void stop() {
 		// TODO
 		// close all opened orders

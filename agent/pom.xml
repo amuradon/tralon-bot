@@ -10,6 +10,10 @@
 	</parent>
 	
 	<artifactId>tralon-agent</artifactId>
+	
+	<properties>
+		<argLine />
+	</properties>
 
 	<dependencies>
 	
@@ -68,6 +72,12 @@
 		<dependency>
 			<groupId>io.quarkus</groupId>
 			<artifactId>quarkus-junit5-mockito</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<!-- managed version comes from quarkus-bom ?! -->
+		<dependency>
+			<groupId>io.fabric8</groupId>
+			<artifactId>mockwebserver</artifactId>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>

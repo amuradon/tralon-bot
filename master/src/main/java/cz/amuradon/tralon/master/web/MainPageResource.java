@@ -95,7 +95,7 @@ public class MainPageResource {
 	@Path("/choose-strategy")
 	@Produces(MediaType.TEXT_HTML)
 	public TemplateInstance runSpotHedge(@RestForm String strategy) {
-		Log.info(strategy);
+		Log.infof("Chosen strategy: %s", strategy);
 		if (strategy.equalsIgnoreCase(SPOT_HEDGE)) {
 			return Templates.dualInvestmentSpotHedge(supportedExchanges);
 		} else if (strategy.equalsIgnoreCase(MARKET_MAKING)) {

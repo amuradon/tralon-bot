@@ -8,9 +8,13 @@ import org.eclipse.microprofile.rest.client.annotation.ClientHeaderParam;
 import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
 import org.jboss.resteasy.reactive.RestQuery;
 
+import com.fasterxml.jackson.core.JsonFactoryBuilder;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import cz.amuradon.tralon.agent.connector.ListenKey;
-import cz.amuradon.tralon.agent.connector.OrderBookResponse;
+import cz.amuradon.tralon.agent.connector.MyInputDecorator;
 import io.quarkus.rest.client.reactive.ClientQueryParam;
+import io.quarkus.rest.client.reactive.jackson.ClientObjectMapper;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
@@ -28,7 +32,7 @@ public interface MexcClient {
 	@Path("/depth")
 	@GET
 	@ClientQueryParam(name = "limit", value = "5000")
-	OrderBookResponse orderBook(@RestQuery String symbol);
+	MexcOrderBookResponse orderBook(@RestQuery String symbol);
 	
 	@Path("/account")
 	@GET
@@ -54,4 +58,10 @@ public interface MexcClient {
 	@POST
 	@ClientHeaderParam(name = "X-MEXC-APIKEY", value = "${mexc.apiKey}")
 	ListenKey userDataStream(@RestQuery Map<String, Object> queryParams);
+	
+	@ClientObjectMapper
+	static ObjectMapper objectMapper(ObjectMapper defaultObjectMapper) {
+		System.out.println("*** Custom Object Mapper ***");
+		return defaultObjectMapper.copyWith(new JsonFactoryBuilder().inputDecorator(new MyInputDecorator()).build());
+	}
 }

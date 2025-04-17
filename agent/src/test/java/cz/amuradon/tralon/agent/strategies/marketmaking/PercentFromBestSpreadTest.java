@@ -1,4 +1,4 @@
-package cz.amuradon.tralon.clm.strategies.marketmaking;
+package cz.amuradon.tralon.agent.strategies.marketmaking;
 
 import java.math.BigDecimal;
 import java.util.Map;

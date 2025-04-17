@@ -1,4 +1,4 @@
-package cz.amuradon.tralon.clm.connector.binance;
+package cz.amuradon.tralon.agent.connector.binance;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.anyMap;

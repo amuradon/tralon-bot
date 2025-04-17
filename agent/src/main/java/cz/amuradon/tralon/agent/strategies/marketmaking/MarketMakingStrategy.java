@@ -169,8 +169,7 @@ public class MarketMakingStrategy implements Strategy {
     	}
     }
 	
-    @Override
-	public void onOrderBookUpdate(OrderBookUpdate update, Map<BigDecimal, BigDecimal> orderBookSide) {
+    private void onOrderBookUpdate(OrderBookUpdate update, Map<BigDecimal, BigDecimal> orderBookSide) {
 		Side side = update.side();
 		PriceProposal proposal = priceProposals.get(side);
 		// TODO timestamp z update -> nezpracovat starsi update?
@@ -223,8 +222,7 @@ public class MarketMakingStrategy implements Strategy {
 	}
 
 	// FIXME Na Kucoin nechodi balance updates spolehlive!
-	@Override
-	public void onBaseBalanceUpdate(BigDecimal balance) {
+	private void onBaseBalanceUpdate(BigDecimal balance) {
        	PriceProposal priceProposal = priceProposals.get(Side.SELL);
        	
        	synchronized (priceProposal) {
@@ -239,8 +237,7 @@ public class MarketMakingStrategy implements Strategy {
        	}
     }
 
-	@Override
-	public void onQuoteBalanceUpdate(BigDecimal balance) {
+	private void onQuoteBalanceUpdate(BigDecimal balance) {
 		PriceProposal priceProposal = priceProposals.get(Side.BUY);
 		
 		synchronized (priceProposal) {

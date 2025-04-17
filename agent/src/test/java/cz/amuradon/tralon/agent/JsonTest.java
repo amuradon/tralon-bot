@@ -1,4 +1,4 @@
-package cz.amuradon.tralon.clm;
+package cz.amuradon.tralon.agent;
 
 import org.junit.jupiter.api.Test;
 

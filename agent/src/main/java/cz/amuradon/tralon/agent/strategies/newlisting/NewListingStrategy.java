@@ -104,7 +104,6 @@ public class NewListingStrategy implements Strategy {
     		final int trailingStopBelow,
 			final int trailingStopDelayMs,
 			final int initialBuyOrderDelayMs) {
-    	
 		scheduler = Executors.newScheduledThreadPool(2);
 		this.restClient = restClient;
 		this.websocketClient = websocketClient;
@@ -151,6 +150,7 @@ public class NewListingStrategy implements Strategy {
 				Math.max(0, now.until(beforeStart.withSecond(59).withNano(980000000), ChronoUnit.MILLIS)),
 				TimeUnit.MILLISECONDS);
 		
+		// FIXME tohle nefunguje spravne, pak se mi nezobrazuji running strategies -> vyextrahovat scheduling mimo
 		try {
 			prepareTask.get();
 			placeNewBuyOrderTask.get();
@@ -161,36 +161,16 @@ public class NewListingStrategy implements Strategy {
 	}
 
 	@Override
-	public void onOrderBookUpdate(OrderBookUpdate update, Map<BigDecimal, BigDecimal> orderBookSide) {
-		// Do nothing
-	}
-
-	@Override
-	public void onBaseBalanceUpdate(BigDecimal balance) {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public void onQuoteBalanceUpdate(BigDecimal balance) {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
 	public void stop() {
-		// TODO Auto-generated method stub
-
+		// TODO Cancel all
 	}
 
 	@Override
 	public String getDescription() {
-		// TODO Auto-generated method stub
-		return null;
+		return String.format("%s{%s, %s}", getClass().getSimpleName(), restClient.getClass().getSimpleName(), symbol);
 	}
 
     // XXX Temporary testing
-//    @Startup
 	public void prepare() {
 		/*
 		 * TODO

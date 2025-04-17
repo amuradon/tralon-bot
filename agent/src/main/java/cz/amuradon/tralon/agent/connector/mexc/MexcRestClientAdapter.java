@@ -25,6 +25,7 @@ import cz.amuradon.tralon.agent.OrderType;
 import cz.amuradon.tralon.agent.Side;
 import cz.amuradon.tralon.agent.connector.AccountBalance;
 import cz.amuradon.tralon.agent.connector.OrderBookResponse;
+import cz.amuradon.tralon.agent.connector.OrderBookResponseImpl;
 import cz.amuradon.tralon.agent.connector.RestClient;
 import cz.amuradon.tralon.agent.connector.RestClientFactory;
 import cz.amuradon.tralon.agent.model.Order;
@@ -80,7 +81,9 @@ public class MexcRestClientAdapter implements RestClient {
 
 	@Override
 	public OrderBookResponse orderBook(String symbol) {
-		return mexcClient.orderBook(symbol);
+		MexcOrderBookResponse mexcOrderBookResponse = mexcClient.orderBook(symbol);
+		return new OrderBookResponseImpl(mexcOrderBookResponse.lastUpdateId(),
+				mexcOrderBookResponse.asks(), mexcOrderBookResponse.bids());
 	}
 
 	@Override
