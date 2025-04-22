@@ -6,12 +6,15 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.function.TriFunction;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.resteasy.reactive.RestForm;
 
+import cz.amuradon.tralon.agent.connector.DataStoringRestClientDecorator;
 import cz.amuradon.tralon.agent.connector.Exchange;
 import cz.amuradon.tralon.agent.connector.RestClient;
 import cz.amuradon.tralon.agent.connector.RestClientFactory;
@@ -52,16 +55,24 @@ public class MainPageResource {
 	
 	private final ScheduledExecutorService scheduler;
 	
+	private final ExecutorService executorService;
+	
+	private final String dataPath;
+	
 	// XXX As of now agent as dep, in future managed by Kubernetes #24
 	@Inject
 	public MainPageResource(@RestClientFactory Instance<RestClient> restClientFactory,
 			@WebsocketClientFactory Instance<WebsocketClient> websocketClientFactory,
-			final ScheduledExecutorService scheduler) {
+			final ScheduledExecutorService scheduler,
+			final ExecutorService executorService,
+			@ConfigProperty(name = "data.path") final String dataPath) {
 		runningStrategies = new ConcurrentSkipListMap<>();
 		supportedExchanges = Arrays.stream(Exchange.values()).map(Exchange::displayName).collect(Collectors.toList());
 		this.restClientFactory = restClientFactory;
 		this.websocketClientFactory = websocketClientFactory;
 		this.scheduler = scheduler;
+		this.executorService = executorService;
+		this.dataPath = dataPath;
 	}
 	
 	@GET
@@ -115,7 +126,7 @@ public class MainPageResource {
 			@RestForm String baseAsset, @RestForm String quoteAsset, @RestForm BigDecimal price,
 			@RestForm BigDecimal baseQuantity, @RestForm BigDecimal mmSpread,
 			@RestForm BigDecimal apr, @RestForm int priceChangeDelayMs) {
-		return runStrategy(exchangeName, baseAsset, quoteAsset, (r, w, s) ->
+		return runStrategy(exchangeName, baseAsset, quoteAsset, false, (r, w, s) ->
 				new DualInvestmentSpotHedgeStrategy(r, w, baseAsset, quoteAsset, s,
 						price, baseQuantity, mmSpread, apr, priceChangeDelayMs));
 	}
@@ -129,7 +140,7 @@ public class MainPageResource {
 			@RestForm int priceChangeDelayMs,
 			@RestForm String spreadStrategy,
 			@RestForm BigDecimal spreadStrategyValue) {
-		return runStrategy(exchangeName, baseAsset, quoteAsset, (r, w, s) -> new MarketMakingStrategy(r, w, baseAsset,
+		return runStrategy(exchangeName, baseAsset, quoteAsset, false, (r, w, s) -> new MarketMakingStrategy(r, w, baseAsset,
 				quoteAsset, s, priceChangeDelayMs, quoteQuantity, scheduler,
 				SpreadStrategies.fromDisplayName(spreadStrategy).create(spreadStrategyValue)));
 	}
@@ -148,8 +159,11 @@ public class MainPageResource {
 			@RestForm int buyOrderMaxAttempts,
 			@RestForm int trailingStopBelow,
 			@RestForm int trailingStopDelayMs,
-			@RestForm int initialBuyOrderValidityMs) {
-		return runStrategy(exchangeName, baseAsset, quoteAsset, (r, w, s) -> new NewListingStrategy(r, w,
+			@RestForm int initialBuyOrderValidityMs,
+			@RestForm boolean storeData) {
+		System.out.println("*** Store data: " + storeData);
+		return runStrategy(exchangeName, baseAsset, quoteAsset, storeData,
+				(r, w, s) -> new NewListingStrategy(r, w,
 				new ComputeInitialPrice(priceExpr), quoteQuantity, s, listingDateTime, buyOrderRequestsPerSecond,
 				buyOrderMaxAttempts, trailingStopBelow, trailingStopDelayMs, initialBuyOrderValidityMs));
 	}
@@ -161,6 +175,7 @@ public class MainPageResource {
 	 * MM strategie: prepinani Spread strategy nemeni SS value
 	 */
 	private TemplateInstance runStrategy(String exchangeName, String baseAsset, String quoteAsset,
+			boolean storeData,
 			TriFunction<RestClient, WebsocketClient, String, Strategy> strategyFactory) {
 		final String id = strategyId(exchangeName, baseAsset, quoteAsset);
 		if (runningStrategies.containsKey(id)) {
@@ -170,12 +185,15 @@ public class MainPageResource {
 			throw new BadRequestException(error);
 		}
 		final Exchange exchange = Exchange.fromDisplayName(exchangeName);
-		final RestClient restClient =
+		RestClient restClient =
 				restClientFactory.select(RestClientFactory.LITERAL, exchange.qualifier()).get();
+		if (storeData) {
+			restClient = new DataStoringRestClientDecorator(restClient, exchangeName, executorService, dataPath);
+		}
 		final WebsocketClient websocketClient =
 				websocketClientFactory.select(WebsocketClientFactory.LITERAL, exchange.qualifier()).get();
 		Strategy strategy = strategyFactory.apply(restClient, websocketClient, exchange.symbol(baseAsset, quoteAsset));
-		strategy.start();
+//		strategy.start();
 		String strategyDescription = strategy.getDescription();
 		runningStrategies.put(id, strategy);
 		Log.infof("Started strategy: %s - %s", id, strategyDescription);
