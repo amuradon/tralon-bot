@@ -11,6 +11,13 @@ import io.quarkus.logging.Log;
 
 // TODO should be split to different strategies (?) like SpreadStrategy for market making
 // ^^^ Neni to prilis omezujici? Jestli ten "String programming" neni flexibilnejsi, ale i chybovejsi?
+/**
+ * Buy order limit price - as of now fixed price
+ * Valid values: "slippage:60" (60% slippage), "auto" TODO (calculate from order book), 
+ *              "manual:0.00125" (use manually set value),
+ * ~~"market"~~ (NA, immediately cancelled)
+ * It seems in first minute, market order is not allowed on MEXC. Was immediately cancelled (MINT).
+ */
 public class ComputeInitialPrice {
 
 	private final String buyOrderPriceProperty;

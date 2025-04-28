@@ -164,7 +164,7 @@ public class MainPageResource {
 			@RestForm boolean storeData) {
 		System.out.println("*** Store data: " + storeData);
 		return runStrategy(exchangeName, baseAsset, quoteAsset, storeData,
-				(r, w, s) -> new NewListingStrategy(r, w,
+				(r, w, s) -> new NewListingStrategy(scheduler, r, w,
 				new ComputeInitialPrice(priceExpr), quoteQuantity, s, listingDateTime, buyOrderRequestsPerSecond,
 				buyOrderMaxAttempts, trailingStopBelow, trailingStopDelayMs, initialBuyOrderValidityMs));
 	}
@@ -195,7 +195,7 @@ public class MainPageResource {
 			websocketClient.setListener(new DataStoringWebsocketClientListener(exchangeName, executorService, dataPath));
 		}
 		Strategy strategy = strategyFactory.apply(restClient, websocketClient, exchange.symbol(baseAsset, quoteAsset));
-//		strategy.start();
+		strategy.start();
 		String strategyDescription = strategy.getDescription();
 		runningStrategies.put(id, strategy);
 		Log.infof("Started strategy: %s - %s", id, strategyDescription);

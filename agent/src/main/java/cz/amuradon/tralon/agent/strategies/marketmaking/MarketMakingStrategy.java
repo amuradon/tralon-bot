@@ -271,7 +271,7 @@ public class MarketMakingStrategy implements Strategy {
 				.price(price)
 				.size(size)
 				.type(OrderType.LIMIT)
-				.send();
+				.send().orderId();
 		orders.put(orderId, new OrderImpl(orderId, symbol, Side.SELL, size, price));
 		return clientOrderId;
 	}

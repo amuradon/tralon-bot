@@ -17,11 +17,15 @@ import java.util.regex.Pattern;
 import cz.amuradon.tralon.agent.OrderStatus;
 import cz.amuradon.tralon.agent.OrderType;
 import cz.amuradon.tralon.agent.Side;
+import cz.amuradon.tralon.agent.connector.InvalidPrice;
+import cz.amuradon.tralon.agent.connector.NewOrderError;
+import cz.amuradon.tralon.agent.connector.NewOrderResponse;
 import cz.amuradon.tralon.agent.connector.OrderBookResponse;
 import cz.amuradon.tralon.agent.connector.OrderChange;
 import cz.amuradon.tralon.agent.connector.RestClient;
 import cz.amuradon.tralon.agent.connector.SymbolInfo;
 import cz.amuradon.tralon.agent.connector.Trade;
+import cz.amuradon.tralon.agent.connector.TradeDirectionNotAllowed;
 import cz.amuradon.tralon.agent.connector.WebsocketClient;
 import cz.amuradon.tralon.agent.strategies.Strategy;
 import io.quarkus.logging.Log;
@@ -29,11 +33,6 @@ import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
 
 public class NewListingStrategy implements Strategy {
-
-	// TODO move MEXC error codes to connector
-	private static final String NOT_YET_TRADING_ERR_CODE = "30001";
-	
-	private static final String ORDER_PRICE_ABOVE_LIMIT_ERR_CODE = "30010";
 
 	private final ScheduledExecutorService scheduler;
 	
@@ -80,6 +79,7 @@ public class NewListingStrategy implements Strategy {
 	private BigDecimal initialBuyPrice;
     
     public NewListingStrategy(
+    		final ScheduledExecutorService scheduler,
     		final RestClient restClient,
     		final WebsocketClient websocketClient,
     		final ComputeInitialPrice computeInitialPrice,
@@ -88,10 +88,10 @@ public class NewListingStrategy implements Strategy {
     		final LocalDateTime listingDateTime,
     		final int buyOrderRequestsPerSecond,
     		final int buyOrderMaxAttempts,
-    		final int trailingStopBelow,
+    		final int trailingStopBelow,   // XXX should be BigDecimal
 			final int trailingStopDelayMs,
 			final int initialBuyOrderDelayMs) {
-		scheduler = Executors.newScheduledThreadPool(2);
+		this.scheduler = scheduler;
 		this.restClient = restClient;
 		this.websocketClient = websocketClient;
 		this.computeInitialPrice = computeInitialPrice;
@@ -156,8 +156,7 @@ public class NewListingStrategy implements Strategy {
 		return String.format("%s{%s, %s}", getClass().getSimpleName(), restClient.getClass().getSimpleName(), symbol);
 	}
 
-    // XXX Temporary testing
-	public void prepare() {
+	private void prepare() {
 		/*
 		 * TODO
 		 * - When application starts delete all existing listenKeys
@@ -172,18 +171,13 @@ public class NewListingStrategy implements Strategy {
 		websocketClient.onOrderChange(this::processOrderUpdate);
 		
 		// get order book
-//		String exchangeInfoJson = restClient.exchangeInfo();
 		OrderBookResponse orderBookResponse = restClient.orderBook(symbol);
 
 		initialBuyPrice = computeInitialPrice.execute(symbol, orderBookResponse);
 		Log.infof("Computed buy limit order price: %s", initialBuyPrice);
-	
-		// XXX temporary testing
-//		placeNewBuyOrder();
 	}
     
-	// XXX Opened for component test for now
-	public void placeNewBuyOrder() {
+	private void placeNewBuyOrder() {
 		// TODO kdyz price jeste neni nasetovana metodou vyse - muze se stat, je to async
 	
 		String clientOrderId = symbol + "-" + HexFormat.of().toHexDigits(new Date().getTime());
@@ -214,6 +208,7 @@ public class NewListingStrategy implements Strategy {
 
 		long previousSendTime = 0;
 		long msPerRequest = Math.round(Math.ceil(1000.0 / buyOrderRequestsPerSecond));
+		
 		for (int i = 0; i < buyOrderMaxAttempts;) {
 			long currentTime = System.currentTimeMillis();
 			if (currentTime - timestamp >= recvWindow) {
@@ -224,33 +219,34 @@ public class NewListingStrategy implements Strategy {
 				i++;
 				previousSendTime = currentTime; 
 				Log.infof("Place new buy limit order attempt %d", i);
-				try {
-					String orderId = newOrderBuilder.send();
-					buyOrderId = orderId;
-					Log.infof("New order placed: %s", orderId);
-					break;
-				} catch (WebApplicationException e) {
-					Response response = e.getResponse();
-					ErrorResponse errorResponse = response.readEntity(ErrorResponse.class);
-					int status = response.getStatus();
-					Log.errorf("ERR response: %d - %s: %s, Headers: %s", status,
-							response.getStatusInfo().getReasonPhrase(), errorResponse, response.getHeaders());
-					if (ORDER_PRICE_ABOVE_LIMIT_ERR_CODE.equalsIgnoreCase(errorResponse.code())) {
-						Matcher matcher = Pattern.compile(".*\\s(\\d+(\\.\\d+)?)USDT").matcher(errorResponse.msg());
-						if (matcher.find()) {
-							String maxPrice = matcher.group(1);
+					NewOrderResponse newOrderResponse = newOrderBuilder.send();
+					if (newOrderResponse.success()) {
+						buyOrderId = newOrderResponse.orderId();
+						Log.infof("New order placed: %s", buyOrderId);
+						break;
+					} else {
+						NewOrderError error = newOrderResponse.error();
+						WebApplicationException e = error.exception();
+						Response response = e.getResponse();
+						ErrorResponse errorResponse = error.errorResponse();
+						int status = response.getStatus();
+						Log.errorf("ERR response: %d - %s: %s, Headers: %s", status,
+								response.getStatusInfo().getReasonPhrase(), errorResponse, response.getHeaders());
+						
+						if (error instanceof InvalidPrice ip) {
+							BigDecimal maxPrice = ip.validPrice();
 							Log.infof("Resetting max price: '%s'", maxPrice);
 							timestamp = currentTime;
-							newOrderBuilder.timestamp(timestamp).price(new BigDecimal(maxPrice)).signParams();
+							newOrderBuilder.timestamp(timestamp).price(maxPrice).signParams();
+						} else if (status == 429) {
+							Log.warnf("Retry after: ", response.getHeaderString("Retry-After"));
+							// Do nothing, repeat
+						} else if (!(error instanceof TradeDirectionNotAllowed)) {
+							Log.infof("It is not \"Not yet trading\" error code '%s - %s', not retrying...",
+									errorResponse.code(), errorResponse.msg());
+							break;
 						}
-					} else if (status == 429) {
-						Log.warnf("Retry after: ", response.getHeaderString("Retry-After"));
-						// Do nothing, repeat
-					} else if (!NOT_YET_TRADING_ERR_CODE.equalsIgnoreCase(errorResponse.code())) {
-						Log.infof("It is not \"Not yet trading\" error code '%s', not retrying...", NOT_YET_TRADING_ERR_CODE);
-						break;
 					}
-				}
 			}
 		}
 	}

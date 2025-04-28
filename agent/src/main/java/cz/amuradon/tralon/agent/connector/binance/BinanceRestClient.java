@@ -20,6 +20,7 @@ import cz.amuradon.tralon.agent.OrderType;
 import cz.amuradon.tralon.agent.Side;
 import cz.amuradon.tralon.agent.connector.AccountBalance;
 import cz.amuradon.tralon.agent.connector.ListenKey;
+import cz.amuradon.tralon.agent.connector.NewOrderResponse;
 import cz.amuradon.tralon.agent.connector.OrderBookResponse;
 import cz.amuradon.tralon.agent.connector.OrderBookResponseImpl;
 import cz.amuradon.tralon.agent.connector.RestClient;
@@ -197,7 +198,7 @@ public class BinanceRestClient implements RestClient {
 		}
 
 		@Override
-		public String send() {
+		public NewOrderResponse send() {
 			if (symbol == null) {
 				throw new IllegalArgumentException("Could not send order - symbol is missing.");
 			}
@@ -208,7 +209,7 @@ public class BinanceRestClient implements RestClient {
 			Integer priceScale = priceScales.get(symbol);
 			parameters.put("price", price.setScale(priceScale, RoundingMode.HALF_UP).toPlainString());
 			
-			return spotClient.createTrade().newOrder(parameters);
+			return new NewOrderResponse(true, spotClient.createTrade().newOrder(parameters), null);
 		}
 
 	}

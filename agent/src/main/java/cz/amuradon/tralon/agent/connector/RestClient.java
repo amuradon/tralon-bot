@@ -34,7 +34,7 @@ public interface RestClient {
 		NewOrderBuilder timestamp(long timestamp);
     	NewOrderBuilder recvWindow(long recvWindow);
     	NewOrderBuilder signParams();
-		String send();
+		NewOrderResponse send();
 	}
 
 }

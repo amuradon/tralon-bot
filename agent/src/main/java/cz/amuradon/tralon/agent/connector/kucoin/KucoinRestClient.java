@@ -15,6 +15,7 @@ import com.kucoin.sdk.rest.response.SymbolResponse;
 import cz.amuradon.tralon.agent.OrderType;
 import cz.amuradon.tralon.agent.Side;
 import cz.amuradon.tralon.agent.connector.AccountBalance;
+import cz.amuradon.tralon.agent.connector.NewOrderResponse;
 import cz.amuradon.tralon.agent.connector.OrderBookResponse;
 import cz.amuradon.tralon.agent.connector.OrderBookResponseImpl;
 import cz.amuradon.tralon.agent.connector.RestClient;
@@ -175,7 +176,7 @@ public class KucoinRestClient implements RestClient {
 		}
 
 		@Override
-		public String send() {
+		public NewOrderResponse send() {
 			if (symbol == null) {
 				throw new IllegalArgumentException("Could not send order - symbol is missing.");
 			}
@@ -187,7 +188,7 @@ public class KucoinRestClient implements RestClient {
 			builder.price(price.setScale(priceScale, RoundingMode.HALF_UP));
 
 			try {
-				return restClient.orderAPI().createOrder(builder.build()).getOrderId();
+				return new NewOrderResponse(true, restClient.orderAPI().createOrder(builder.build()).getOrderId(), null);
 			} catch (IOException e) {
 				throw new IllegalStateException("Could not send new order request.", e);
 			}
