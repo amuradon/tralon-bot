@@ -12,12 +12,14 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import cz.amuradon.tralon.agent.connector.AccountBalance;
+import cz.amuradon.tralon.agent.connector.NoopWebsocketClientListener;
 import cz.amuradon.tralon.agent.connector.OrderBookChange;
 import cz.amuradon.tralon.agent.connector.OrderChange;
 import cz.amuradon.tralon.agent.connector.RestClient;
 import cz.amuradon.tralon.agent.connector.Trade;
 import cz.amuradon.tralon.agent.connector.WebsocketClient;
 import cz.amuradon.tralon.agent.connector.WebsocketClientFactory;
+import cz.amuradon.tralon.agent.connector.WebsocketClientListener;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -45,6 +47,8 @@ public class MexcWebsocketClient implements WebsocketClient {
 	
 	private final RestClient restClient;
 	
+	private WebsocketClientListener listener;
+	
 	private final ObjectMapper mapper;
 	
 	private Consumer<AccountBalance> accountBalanceCallback;
@@ -66,10 +70,15 @@ public class MexcWebsocketClient implements WebsocketClient {
 			@Mexc RestClient restClient) {
 		this.baseUri = baseUri;
 		this.restClient = restClient;
+		this.listener = new NoopWebsocketClientListener();
 		mapper = new ObjectMapper();
 		accountBalanceCallback = e -> {};
 		orderChangeCallback = e -> {};
 		orderBookChangeCallback = e -> {};
+	}
+	
+	public void setListener(WebsocketClientListener listener) {
+		this.listener = listener;
 	}
 	
 	private void connect() {
@@ -101,20 +110,25 @@ public class MexcWebsocketClient implements WebsocketClient {
 			JsonNode tree = mapper.readTree(message);
 			JsonNode channelNode = tree.get("c");
 			JsonNode data = tree.get("d");
+			final String symbol = tree.get("s").asText();
 			if (channelNode != null) {
 				String channel = channelNode.asText();
 				if (depthUpdatesChannel.equalsIgnoreCase(channel)) {
+					listener.onOrderBookUpdate(symbol, message);
 					orderBookChangeCallback.accept(mapper.treeToValue(data, MexcOrderBookChange.class));
 				} else if (tradeUpdatesChannel.equalsIgnoreCase(channel)) {
+					listener.onTrade(symbol, message);
 					MexcTradeEventData dealsData = mapper.treeToValue(data, MexcTradeEventData.class);
 					for (Trade trade : dealsData.deals()) {
 						tradeCallback.accept(trade);
 					}
 				} else if (SPOT_ACCOUNT_UPDATES_CHANNEL.equalsIgnoreCase(channel)) {
+					listener.onAccountBalanceUpdate(message);
 					accountBalanceCallback.accept(mapper.treeToValue(data, MexcAccountBalanceUpdate.class));
 				} else if (SPOT_ORDER_UPDATES_CHANNEL.equalsIgnoreCase(channel)) {
+					listener.onOrderUpdate(message);
 					Std values = new InjectableValues.Std();
-					values.addValue("symbol", tree.get("s").asText());
+					values.addValue("symbol", symbol);
 					orderChangeCallback.accept(mapper.readerFor(MexcOrderChange.class).with(values).readValue(data));
 				}
 			}

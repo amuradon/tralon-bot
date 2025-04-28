@@ -11,6 +11,7 @@ import cz.amuradon.tralon.agent.connector.OrderChange;
 import cz.amuradon.tralon.agent.connector.Trade;
 import cz.amuradon.tralon.agent.connector.WebsocketClient;
 import cz.amuradon.tralon.agent.connector.WebsocketClientFactory;
+import cz.amuradon.tralon.agent.connector.WebsocketClientListener;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -49,6 +50,11 @@ public class KucoinWebsocketClient implements WebsocketClient {
 	public void onTrade(Consumer<Trade> callback, String symbol) {
 		wsClientPublic.onLevel3Data_V2(e -> callback.accept(new KucoinTrade(e.getData())), symbol);
 		
+	}
+
+	@Override
+	public void setListener(WebsocketClientListener listener) {
+		// TODO Implementovat az bude bez SDK v low-level
 	}
 
 }

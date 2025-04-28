@@ -7,7 +7,6 @@ import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.HexFormat;
-import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -15,13 +14,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.eclipse.microprofile.config.inject.ConfigProperty;
-
 import cz.amuradon.tralon.agent.OrderStatus;
 import cz.amuradon.tralon.agent.OrderType;
 import cz.amuradon.tralon.agent.Side;
 import cz.amuradon.tralon.agent.connector.OrderBookResponse;
-import cz.amuradon.tralon.agent.connector.OrderBookUpdate;
 import cz.amuradon.tralon.agent.connector.OrderChange;
 import cz.amuradon.tralon.agent.connector.RestClient;
 import cz.amuradon.tralon.agent.connector.SymbolInfo;
@@ -39,8 +35,6 @@ public class NewListingStrategy implements Strategy {
 	
 	private static final String ORDER_PRICE_ABOVE_LIMIT_ERR_CODE = "30010";
 
-	private static final String TIME_PROP_NAME = "time";
-
 	private final ScheduledExecutorService scheduler;
 	
 	private final RestClient restClient;
@@ -55,8 +49,6 @@ public class NewListingStrategy implements Strategy {
     private final int buyOrderRequestsPerSecond;
 	private final int buyOrderMaxAttempts;
     
-//    private final Path dataDir;
-    
     private final int listingHour;
     
     private final int listingMinute;
@@ -66,10 +58,6 @@ public class NewListingStrategy implements Strategy {
 	private final int trailingStopDelayMs;
 	
 	private final int initialBuyOrderDelayMs;
-	
-//	private final Path tradeUpdatesFilePath;
-//	
-//	private final Path depthUpdatesFilePath; 
 	
 	private boolean initialBuyValid = true;
 	
@@ -98,7 +86,6 @@ public class NewListingStrategy implements Strategy {
     		final BigDecimal maxQuoteBalanceToUse,
     		final String symbol,
     		final LocalDateTime listingDateTime,
-//    		@Named(BeanConfig.DATA_DIR) final Path dataDir,
     		final int buyOrderRequestsPerSecond,
     		final int buyOrderMaxAttempts,
     		final int trailingStopBelow,
@@ -112,7 +99,6 @@ public class NewListingStrategy implements Strategy {
     	this.symbol = symbol;
     	this.buyOrderRequestsPerSecond = buyOrderRequestsPerSecond;
     	this.buyOrderMaxAttempts = buyOrderMaxAttempts;
-//    	this.dataDir = dataDir;
     	this.trailingStopBelow = trailingStopBelow;
 		this.trailingStopDelayMs = trailingStopDelayMs;
 		this.initialBuyOrderDelayMs = initialBuyOrderDelayMs;
@@ -189,25 +175,9 @@ public class NewListingStrategy implements Strategy {
 //		String exchangeInfoJson = restClient.exchangeInfo();
 		OrderBookResponse orderBookResponse = restClient.orderBook(symbol);
 
-		// TODO how to collect those data as well? Connector decorator? How to store in files again.
-//		try {
-//			Files.writeString(dataDir.resolve("exchangeInfo.json"), exchangeInfoJson, StandardOpenOption.CREATE);
-//			Files.writeString(dataDir.resolve("depth.json"), orderBookResponse.toString(), StandardOpenOption.CREATE);
-//		} catch (IOException e) {
-//			throw new IllegalStateException("Could write JSON to files", e);
-//		}
-		
-
-//		try {
-//			ExchangeInfo exchangeInfo = mapper.readValue(exchangeInfoJson, ExchangeInfo.class);
-//			OrderBook orderBook = mapper.readValue(orderBookJson, OrderBook.class);
-			
-			initialBuyPrice = computeInitialPrice.execute(symbol, orderBookResponse);
-			Log.infof("Computed buy limit order price: %s", initialBuyPrice);
-//		} catch (JsonProcessingException e) {
-//			throw new IllegalStateException("JSON could not be parsed", e);
-//		}
-		
+		initialBuyPrice = computeInitialPrice.execute(symbol, orderBookResponse);
+		Log.infof("Computed buy limit order price: %s", initialBuyPrice);
+	
 		// XXX temporary testing
 //		placeNewBuyOrder();
 	}

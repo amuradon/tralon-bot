@@ -12,11 +12,13 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import cz.amuradon.tralon.agent.connector.AccountBalance;
+import cz.amuradon.tralon.agent.connector.NoopWebsocketClientListener;
 import cz.amuradon.tralon.agent.connector.OrderBookChange;
 import cz.amuradon.tralon.agent.connector.OrderChange;
 import cz.amuradon.tralon.agent.connector.Trade;
 import cz.amuradon.tralon.agent.connector.WebsocketClient;
 import cz.amuradon.tralon.agent.connector.WebsocketClientFactory;
+import cz.amuradon.tralon.agent.connector.WebsocketClientListener;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 
@@ -36,29 +38,33 @@ public class BinanceWebsocketClient implements WebsocketClient {
 	
 	private boolean connected;
 	
+	private WebsocketClientListener listener;
+	
 	public BinanceWebsocketClient(final SpotClient spotClient) {
 		this.spotClient = spotClient;
 		mapper = new ObjectMapper();
 		accountBalanceCallback = e -> {};
 		orderChangeCallback = e -> {};
 		client = new WebSocketStreamClientImpl();
+		listener = new NoopWebsocketClientListener();
 	}
 	
 	private boolean connect() {
 		String listenKey;
 		try {
 			listenKey = mapper.readTree(spotClient.createUserData().createListenKey()).get("listenKey").asText();
-	        System.out.println("listenKey:" + listenKey);
 	        client.listenUserStream(listenKey, ((event) -> {
 	            Log.debugf("User stream event: %s", event);
 	            try {
 					JsonNode tree = mapper.readTree(event);
 					String eventType = tree.get("e").asText();
 					if ("outboundAccountPosition".equalsIgnoreCase(eventType)) {
+						listener.onAccountBalanceUpdate(event);
 						mapper.treeToValue(tree.get("B"), new TypeReference<List<BinanceAccountBalanceUpdate>>() { })
 							.stream().forEach(b -> accountBalanceCallback.accept(b));
 						
 					} else if ("executionReport".equalsIgnoreCase(eventType)) {
+						listener.onOrderUpdate(event);
 						orderChangeCallback.accept(mapper.readValue(event, BinanceOrderChange.class));
 					}
 				} catch (JsonProcessingException e) {
@@ -91,6 +97,7 @@ public class BinanceWebsocketClient implements WebsocketClient {
 		}
 		client.diffDepthStream(symbol, 100, data -> {
 			try {
+				listener.onOrderBookUpdate(symbol, data);
 				callback.accept(mapper.readValue(data, BinanceOrderBookChange.class));
 			} catch (JsonProcessingException e) {
 				throw new IllegalStateException("Could not parse Websocket JSON", e);
@@ -113,12 +120,18 @@ public class BinanceWebsocketClient implements WebsocketClient {
 		}
 		client.tradeStream(symbol, data -> {
 			try {
+				listener.onTrade(symbol, data);
 				callback.accept(mapper.readValue(data, BinanaceTrade.class));
 			} catch (JsonProcessingException e) {
 				throw new IllegalStateException("Could not parse Websocket JSON", e);
 			}
 		});
 		
+	}
+
+	@Override
+	public void setListener(WebsocketClientListener listener) {
+		this.listener = listener;
 	}
 
 }

@@ -15,6 +15,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.resteasy.reactive.RestForm;
 
 import cz.amuradon.tralon.agent.connector.DataStoringRestClientDecorator;
+import cz.amuradon.tralon.agent.connector.DataStoringWebsocketClientListener;
 import cz.amuradon.tralon.agent.connector.Exchange;
 import cz.amuradon.tralon.agent.connector.RestClient;
 import cz.amuradon.tralon.agent.connector.RestClientFactory;
@@ -187,11 +188,12 @@ public class MainPageResource {
 		final Exchange exchange = Exchange.fromDisplayName(exchangeName);
 		RestClient restClient =
 				restClientFactory.select(RestClientFactory.LITERAL, exchange.qualifier()).get();
-		if (storeData) {
-			restClient = new DataStoringRestClientDecorator(restClient, exchangeName, executorService, dataPath);
-		}
 		final WebsocketClient websocketClient =
 				websocketClientFactory.select(WebsocketClientFactory.LITERAL, exchange.qualifier()).get();
+		if (storeData) {
+			restClient = new DataStoringRestClientDecorator(restClient, exchangeName, executorService, dataPath);
+			websocketClient.setListener(new DataStoringWebsocketClientListener(exchangeName, executorService, dataPath));
+		}
 		Strategy strategy = strategyFactory.apply(restClient, websocketClient, exchange.symbol(baseAsset, quoteAsset));
 //		strategy.start();
 		String strategyDescription = strategy.getDescription();
