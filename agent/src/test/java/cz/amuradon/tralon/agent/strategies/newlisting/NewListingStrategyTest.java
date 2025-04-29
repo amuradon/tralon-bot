@@ -12,11 +12,14 @@ import static org.mockito.Mockito.when;
 import java.math.BigDecimal;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiFunction;
 import java.util.stream.Stream;
 
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,11 +27,15 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Answers;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
+import cz.amuradon.tralon.agent.connector.InvalidPrice;
+import cz.amuradon.tralon.agent.connector.NewOrderError;
 import cz.amuradon.tralon.agent.connector.NewOrderResponse;
 import cz.amuradon.tralon.agent.connector.RestClient;
 import cz.amuradon.tralon.agent.connector.WebsocketClient;
@@ -53,7 +60,7 @@ public class NewListingStrategyTest {
 	private Path dataPathMock;
 	
 	@Mock(answer = Answers.RETURNS_SELF)
-	private RestClient.NewOrderBuilder newOrderRequestBuilderMock;
+	private RestClient.NewOrderBuilder newOrderBuilderMock;
 	
 	@Mock
 	private ScheduledExecutorService scheduledExecutorServiceMock;
@@ -61,12 +68,14 @@ public class NewListingStrategyTest {
 	@Mock
 	private ScheduledFuture<?> scheduledFutureMock;
 	
+	@Captor
+	private ArgumentCaptor<BigDecimal> priceCaptor;
+	
 	private NewListingStrategy strategy;
 	
 	@BeforeEach
 	public void prepare() {
-		when(restClientMock.newOrder()).thenReturn(newOrderRequestBuilderMock);
-		when(newOrderRequestBuilderMock.send()).thenReturn(new NewOrderResponse(true, "orderId", null));
+		when(restClientMock.newOrder()).thenReturn(newOrderBuilderMock);
 		when(scheduledExecutorServiceMock.schedule(any(Runnable.class), anyLong(), any(TimeUnit.class)))
 			.thenAnswer(i -> {
 				i.getArgument(0, Runnable.class).run();
@@ -80,41 +89,59 @@ public class NewListingStrategyTest {
 
 	@Test
 	public void testSuccessfulSend() throws Exception {
+		when(newOrderBuilderMock.send()).thenReturn(new NewOrderResponse(true, "orderId", null));
 		strategy.start();
-		verify(newOrderRequestBuilderMock).send();
+		verify(newOrderBuilderMock).send();
 	}
 
-	@ParameterizedTest
-	@MethodSource("errorResponsePriceData")
-	public void errorResponsePrice(String errorMessage, String expectedMaxPrice) throws Exception {
+	@Test
+	public void invalidPrice() throws Exception {
+		mockNewOrderException(400, (e, r) -> new InvalidPrice(e, new BigDecimal("0.05"), r));
+		
+		strategy.start();
+		
+		verify(newOrderBuilderMock, times(2)).price(priceCaptor.capture());
+		verify(newOrderBuilderMock, times(2)).send();
+		
+		List<BigDecimal> prices = priceCaptor.getAllValues();
+		Assertions.assertEquals(2, prices.size());
+		Assertions.assertEquals(new BigDecimal("0.1"), prices.get(0));
+		Assertions.assertEquals(new BigDecimal("0.05"), prices.get(1));
+	}
+
+	@Test
+	public void tooManyRequests() throws Exception {
+		mockNewOrderException(429, (e, r) -> new NewOrderError(e, r));
+		
+		strategy.start();
+		
+		verify(newOrderBuilderMock).price(priceCaptor.capture());
+		verify(newOrderBuilderMock, times(2)).send();
+	}
+	
+	@Test
+	public void tradeDirectionNotAllowed() throws Exception {
+		mockNewOrderException(429, (e, r) -> new NewOrderError(e, r));
+		
+		strategy.start();
+		
+		verify(newOrderBuilderMock).price(priceCaptor.capture());
+		verify(newOrderBuilderMock, times(2)).send();
+	}
+
+	private void mockNewOrderException(int status, BiFunction<WebApplicationException, ErrorResponse, NewOrderError> errorFactory) {
 		WebApplicationException webApplicationExceptionMock = mock(WebApplicationException.class);
 		Response responseMock = mock(Response.class);
 		StatusType statusTypeMock = mock(StatusType.class);
 		
 		when(webApplicationExceptionMock.getResponse()).thenReturn(responseMock);
-		when(responseMock.getStatus()).thenReturn(400);
-		when(responseMock.readEntity(ErrorResponse.class))
-				.thenReturn(new ErrorResponse("30010", errorMessage));
+		when(responseMock.getStatus()).thenReturn(status);
+		ErrorResponse errorResponse = new ErrorResponse("1111", "some error message");
 		when(responseMock.getStatusInfo()).thenReturn(statusTypeMock);
 		when(statusTypeMock.getReasonPhrase()).thenReturn("Bad Request");
-		
-		doThrow(webApplicationExceptionMock).when(newOrderRequestBuilderMock).send();
-		strategy.start();
-		
-		// XXX zatim nemam, ze druhy pokus je success...
-		verify(newOrderRequestBuilderMock, times(2)).price(new BigDecimal(expectedMaxPrice));
+		when(newOrderBuilderMock.send()).thenReturn(new NewOrderResponse(false, null,
+				errorFactory.apply(webApplicationExceptionMock, errorResponse)),
+				new NewOrderResponse(true, "orderId", null));
 	}
-	
-	static Stream<Arguments> errorResponsePriceData() {
-		return Stream.of(
-				Arguments.of("Order price cannot exceed 5USDT", "5"),
-				Arguments.of("Order price cannot exceed 0.05USDT", "0.05")
-		);
-	}
-	
-	/*
-	 * TODO
-	 * - testovat opakovani posilani
-	 */
 	
 }

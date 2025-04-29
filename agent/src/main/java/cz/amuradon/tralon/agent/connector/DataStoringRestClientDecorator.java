@@ -1,5 +1,6 @@
 package cz.amuradon.tralon.agent.connector;
 
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -10,9 +11,9 @@ public class DataStoringRestClientDecorator extends DataStoringBase implements R
 
 	private final RestClient delegate;
 	
-	public DataStoringRestClientDecorator(final RestClient delegate, final String exchangeName,
-			final ExecutorService executorService, final String dataDir) {
-		super(exchangeName, executorService, dataDir);
+	public DataStoringRestClientDecorator(final RestClient delegate,
+			final ExecutorService executorService, final Path dataDir) {
+		super(executorService, dataDir);
 		this.delegate = delegate;
 	}
 	

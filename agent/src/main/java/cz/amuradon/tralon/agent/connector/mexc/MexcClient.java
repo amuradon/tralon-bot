@@ -5,10 +5,12 @@ import java.util.Map;
 
 import org.eclipse.microprofile.faulttolerance.Retry;
 import org.eclipse.microprofile.rest.client.annotation.ClientHeaderParam;
+import org.eclipse.microprofile.rest.client.annotation.RegisterProvider;
 import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
 import org.jboss.resteasy.reactive.RestQuery;
 
 import cz.amuradon.tralon.agent.connector.ListenKey;
+import cz.amuradon.tralon.agent.connector.MyReaderInterceptor;
 import io.quarkus.rest.client.reactive.ClientQueryParam;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
@@ -17,6 +19,7 @@ import jakarta.ws.rs.Path;
 
 @ClientHeaderParam(name = "Content-Type", value = "application/json")
 @RegisterRestClient(configKey = "mexc-api")
+@RegisterProvider(MyReaderInterceptor.class)
 @Retry(maxRetries = 10)
 public interface MexcClient {
 

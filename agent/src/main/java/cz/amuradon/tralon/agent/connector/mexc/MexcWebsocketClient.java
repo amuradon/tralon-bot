@@ -110,9 +110,9 @@ public class MexcWebsocketClient implements WebsocketClient {
 			JsonNode tree = mapper.readTree(message);
 			JsonNode channelNode = tree.get("c");
 			JsonNode data = tree.get("d");
-			final String symbol = tree.get("s").asText();
 			if (channelNode != null) {
 				String channel = channelNode.asText();
+				final String symbol = tree.get("s").asText();
 				if (depthUpdatesChannel.equalsIgnoreCase(channel)) {
 					listener.onOrderBookUpdate(symbol, message);
 					orderBookChangeCallback.accept(mapper.treeToValue(data, MexcOrderBookChange.class));

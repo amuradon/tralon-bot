@@ -64,6 +64,14 @@ public class MexcRestClientAdapter implements RestClient {
 	@Inject
 	public MexcRestClientAdapter(@ConfigProperty(name = "mexc.secretKey") final String secretKey,
 			@org.eclipse.microprofile.rest.client.inject.RestClient final MexcClient mexcClient) {
+		this(secretKey, mexcClient, new ConcurrentHashMap<>(), new ConcurrentHashMap<>());
+	}
+	
+	// For testing
+	MexcRestClientAdapter(final String secretKey,
+			final MexcClient mexcClient,
+			final Map<String, Integer> quantityScales,
+			final Map<String, Integer> priceScales) {
 		this.mexcClient = mexcClient;
 		try {
 			mac = Mac.getInstance(HMAC_SHA256);
@@ -71,8 +79,8 @@ public class MexcRestClientAdapter implements RestClient {
 		} catch (NoSuchAlgorithmException | InvalidKeyException e) {
 			throw new IllegalStateException("Could not setup encoder", e);
 		}
-		quantityScales = new ConcurrentHashMap<>();
-		priceScales = new ConcurrentHashMap<>();
+		this.quantityScales = quantityScales;
+		this.priceScales = priceScales;
 	}
 	
 	@Override

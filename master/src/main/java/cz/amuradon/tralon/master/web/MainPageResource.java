@@ -1,7 +1,11 @@
 package cz.amuradon.tralon.master.web;
 
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -58,7 +62,7 @@ public class MainPageResource {
 	
 	private final ExecutorService executorService;
 	
-	private final String dataPath;
+	private final String dataRootPath;
 	
 	// XXX As of now agent as dep, in future managed by Kubernetes #24
 	@Inject
@@ -66,14 +70,14 @@ public class MainPageResource {
 			@WebsocketClientFactory Instance<WebsocketClient> websocketClientFactory,
 			final ScheduledExecutorService scheduler,
 			final ExecutorService executorService,
-			@ConfigProperty(name = "data.path") final String dataPath) {
+			@ConfigProperty(name = "data.path") final String dataRootPath) {
 		runningStrategies = new ConcurrentSkipListMap<>();
 		supportedExchanges = Arrays.stream(Exchange.values()).map(Exchange::displayName).collect(Collectors.toList());
 		this.restClientFactory = restClientFactory;
 		this.websocketClientFactory = websocketClientFactory;
 		this.scheduler = scheduler;
 		this.executorService = executorService;
-		this.dataPath = dataPath;
+		this.dataRootPath = dataRootPath;
 	}
 	
 	@GET
@@ -190,11 +194,21 @@ public class MainPageResource {
 				restClientFactory.select(RestClientFactory.LITERAL, exchange.qualifier()).get();
 		final WebsocketClient websocketClient =
 				websocketClientFactory.select(WebsocketClientFactory.LITERAL, exchange.qualifier()).get();
+		
+		String symbol = exchange.symbol(baseAsset, quoteAsset);
 		if (storeData) {
-			restClient = new DataStoringRestClientDecorator(restClient, exchangeName, executorService, dataPath);
-			websocketClient.setListener(new DataStoringWebsocketClientListener(exchangeName, executorService, dataPath));
+			String dateFolder = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+			java.nio.file.Path dataPath = java.nio.file.Path.of(dataRootPath, exchangeName, dateFolder, symbol);
+			try {
+				Files.createDirectories(dataPath);
+			} catch (IOException e) {
+				throw new IllegalStateException("Could not create data folders.", e);
+			}
+			restClient = new DataStoringRestClientDecorator(restClient, executorService, dataPath);
+			websocketClient.setListener(new DataStoringWebsocketClientListener(executorService, dataPath));
 		}
-		Strategy strategy = strategyFactory.apply(restClient, websocketClient, exchange.symbol(baseAsset, quoteAsset));
+
+		Strategy strategy = strategyFactory.apply(restClient, websocketClient, symbol);
 		strategy.start();
 		String strategyDescription = strategy.getDescription();
 		runningStrategies.put(id, strategy);

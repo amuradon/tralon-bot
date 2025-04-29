@@ -1,12 +1,12 @@
 package cz.amuradon.tralon.agent.connector;
 
+import java.nio.file.Path;
 import java.util.concurrent.ExecutorService;
 
 public class DataStoringWebsocketClientListener extends DataStoringBase implements WebsocketClientListener {
 
-	public DataStoringWebsocketClientListener(final String exchangeName,
-			final ExecutorService executorService, final String dataDir) {
-		super(exchangeName, executorService, dataDir);
+	public DataStoringWebsocketClientListener(final ExecutorService executorService, final Path dataDir) {
+		super(executorService, dataDir);
 	}
 	
 	@Override

@@ -22,9 +22,8 @@ public class ComputeInitialPriceTest {
 		asks.add(Lists.newArrayList("0.36", "30"));
 		
 		OrderBookResponseImpl orderBook = new OrderBookResponseImpl(1L, asks, new ArrayList<>()); 
-		BigDecimal result = compute.execute("VPTUSDT",
-				orderBook);
-		Assertions.assertEquals(new BigDecimal("0.408000"), result);
+		BigDecimal result = compute.execute("VPTUSDT", orderBook);
+		Assertions.assertEquals(new BigDecimal("0.40800000000000"), result);
 	}
 	
 	@Test
