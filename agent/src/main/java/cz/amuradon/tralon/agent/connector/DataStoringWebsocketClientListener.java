@@ -11,13 +11,13 @@ public class DataStoringWebsocketClientListener extends DataStoringBase implemen
 	
 	@Override
 	public void onOrderBookUpdate(String symbol, String message) {
-		writeToFile(symbol, message, "orderBookUpdates.json");
+		writeToFile(message, "orderBookUpdates.json");
 
 	}
 
 	@Override
 	public void onTrade(String symbol, String message) {
-		writeToFile(symbol, message, "trades.json");
+		writeToFile(message, "trades.json");
 	}
 
 	@Override

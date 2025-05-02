@@ -24,6 +24,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
 
 import cz.amuradon.tralon.agent.connector.InvalidPrice;
@@ -59,7 +60,7 @@ public class MexcRestClientAdapterTest {
 		quantityScales = new HashMap<>();
 		priceScales = new HashMap<>();
 		
-		client = new MexcRestClientAdapter("secretKey", mexcClientMock, quantityScales, priceScales);
+		client = new MexcRestClientAdapter("secretKey", mexcClientMock, new ObjectMapper(), quantityScales, priceScales);
 	}
 	
 	@ParameterizedTest

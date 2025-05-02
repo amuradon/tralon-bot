@@ -21,7 +21,7 @@ import cz.amuradon.tralon.agent.connector.WebsocketClient;
 import cz.amuradon.tralon.agent.connector.WebsocketClientFactory;
 import cz.amuradon.tralon.agent.connector.WebsocketClientListener;
 import io.quarkus.logging.Log;
-import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.context.Dependent;
 import jakarta.inject.Inject;
 import jakarta.websocket.ClientEndpoint;
 import jakarta.websocket.ContainerProvider;
@@ -30,7 +30,7 @@ import jakarta.websocket.OnMessage;
 import jakarta.websocket.Session;
 
 @ClientEndpoint
-@ApplicationScoped  // XXX Should not it be rather @Dependent per strategy?
+@Dependent
 @Mexc
 @WebsocketClientFactory // Required for proper usage with Instance
 public class MexcWebsocketClient implements WebsocketClient {

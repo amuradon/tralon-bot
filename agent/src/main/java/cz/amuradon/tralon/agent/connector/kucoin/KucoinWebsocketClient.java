@@ -12,10 +12,10 @@ import cz.amuradon.tralon.agent.connector.Trade;
 import cz.amuradon.tralon.agent.connector.WebsocketClient;
 import cz.amuradon.tralon.agent.connector.WebsocketClientFactory;
 import cz.amuradon.tralon.agent.connector.WebsocketClientListener;
-import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.context.Dependent;
 import jakarta.inject.Inject;
 
-@ApplicationScoped
+@Dependent
 @Kucoin
 @WebsocketClientFactory // Required for proper usage with Instance
 public class KucoinWebsocketClient implements WebsocketClient {

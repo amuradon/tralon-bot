@@ -23,26 +23,31 @@ import javax.crypto.spec.SecretKeySpec;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import cz.amuradon.tralon.agent.OrderType;
 import cz.amuradon.tralon.agent.Side;
 import cz.amuradon.tralon.agent.connector.AccountBalance;
-import cz.amuradon.tralon.agent.connector.NewOrderResponse;
 import cz.amuradon.tralon.agent.connector.InvalidPrice;
 import cz.amuradon.tralon.agent.connector.NewOrderError;
+import cz.amuradon.tralon.agent.connector.NewOrderResponse;
+import cz.amuradon.tralon.agent.connector.NoopRestClientListener;
 import cz.amuradon.tralon.agent.connector.OrderBookResponse;
 import cz.amuradon.tralon.agent.connector.OrderBookResponseImpl;
 import cz.amuradon.tralon.agent.connector.RestClient;
 import cz.amuradon.tralon.agent.connector.RestClientFactory;
+import cz.amuradon.tralon.agent.connector.RestClientListener;
 import cz.amuradon.tralon.agent.connector.TradeDirectionNotAllowed;
 import cz.amuradon.tralon.agent.model.Order;
 import cz.amuradon.tralon.agent.strategies.newlisting.ErrorResponse;
 import io.quarkus.logging.Log;
-import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.context.Dependent;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
 
-@ApplicationScoped
+@Dependent
 @Mexc
 @RestClientFactory // Required for proper usage with Instance
 public class MexcRestClientAdapter implements RestClient {
@@ -56,23 +61,31 @@ public class MexcRestClientAdapter implements RestClient {
 	
 	private final MexcClient mexcClient;
 	
+	private RestClientListener listener;
+	
 	private Mac mac;
+	
+	private final ObjectMapper objectMapper;
 	
 	private final Map<String, Integer> quantityScales;
 	private final Map<String, Integer> priceScales;
 	
 	@Inject
 	public MexcRestClientAdapter(@ConfigProperty(name = "mexc.secretKey") final String secretKey,
-			@org.eclipse.microprofile.rest.client.inject.RestClient final MexcClient mexcClient) {
-		this(secretKey, mexcClient, new ConcurrentHashMap<>(), new ConcurrentHashMap<>());
+			@org.eclipse.microprofile.rest.client.inject.RestClient final MexcClient mexcClient,
+			final ObjectMapper objectMapper) {
+		this(secretKey, mexcClient, objectMapper, new ConcurrentHashMap<>(), new ConcurrentHashMap<>());
 	}
 	
 	// For testing
 	MexcRestClientAdapter(final String secretKey,
 			final MexcClient mexcClient,
+			final ObjectMapper objectMapper,
 			final Map<String, Integer> quantityScales,
 			final Map<String, Integer> priceScales) {
 		this.mexcClient = mexcClient;
+		this.listener = new NoopRestClientListener();
+		this.objectMapper = objectMapper;
 		try {
 			mac = Mac.getInstance(HMAC_SHA256);
 			mac.init(new SecretKeySpec(secretKey.getBytes(), HMAC_SHA256));
@@ -104,9 +117,15 @@ public class MexcRestClientAdapter implements RestClient {
 
 	@Override
 	public OrderBookResponse orderBook(String symbol) {
-		MexcOrderBookResponse mexcOrderBookResponse = mexcClient.orderBook(symbol);
-		return new OrderBookResponseImpl(mexcOrderBookResponse.lastUpdateId(),
-				mexcOrderBookResponse.asks(), mexcOrderBookResponse.bids());
+		try {
+			String response = mexcClient.orderBook(symbol);
+			listener.onOrderBook(symbol, response);
+			MexcOrderBookResponse mexcOrderBookResponse = objectMapper.readValue(response, MexcOrderBookResponse.class);
+			return new OrderBookResponseImpl(mexcOrderBookResponse.lastUpdateId(),
+					mexcOrderBookResponse.asks(), mexcOrderBookResponse.bids());
+		} catch (JsonProcessingException e) {
+			throw new IllegalStateException("Could not read JSON.", e);
+		}
 	}
 
 	@Override
@@ -115,13 +134,19 @@ public class MexcRestClientAdapter implements RestClient {
 			return new cz.amuradon.tralon.agent.connector.SymbolInfo(priceScales.get(symbol));
 		}
 		
-		ExchangeInfo exchnageInfo = mexcClient.exchangeInfo(symbol);
-		SymbolInfo symbolInfo = exchnageInfo.symbols().get(0);
-		
-		quantityScales.put(symbol, symbolInfo.baseSizePrecision().stripTrailingZeros().scale());
-		int priceScale = symbolInfo.quoteAssetPrecision();
-		priceScales.put(symbol, priceScale);
-		return new cz.amuradon.tralon.agent.connector.SymbolInfo(priceScale);
+		try {
+			String response = mexcClient.exchangeInfo(symbol);
+			listener.onExchangeInfo(symbol, response);
+			ExchangeInfo exchnageInfo = objectMapper.readValue(response, ExchangeInfo.class);
+			SymbolInfo symbolInfo = exchnageInfo.symbols().get(0);
+			
+			quantityScales.put(symbol, symbolInfo.baseSizePrecision().stripTrailingZeros().scale());
+			int priceScale = symbolInfo.quoteAssetPrecision();
+			priceScales.put(symbol, priceScale);
+			return new cz.amuradon.tralon.agent.connector.SymbolInfo(priceScale);
+		} catch (JsonProcessingException e) {
+			throw new IllegalStateException("Could not read JSON.", e);
+		}
 	}
 
 	@Override
@@ -142,6 +167,11 @@ public class MexcRestClientAdapter implements RestClient {
 	@Override
 	public String userDataStream() {
 		return mexcClient.userDataStream(signQueryParams(param("timestamp", new Date().getTime()))).listenKey();
+	}
+	
+	@Override
+	public void setListener(RestClientListener listener) {
+		this.listener = listener;
 	}
 	
 	public class MexcNewOrderRequestBuilder implements NewOrderBuilder {
@@ -261,4 +291,5 @@ public class MexcRestClientAdapter implements RestClient {
     	}
 
     }
+
 }

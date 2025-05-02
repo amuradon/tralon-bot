@@ -20,9 +20,9 @@ import cz.amuradon.tralon.agent.connector.WebsocketClient;
 import cz.amuradon.tralon.agent.connector.WebsocketClientFactory;
 import cz.amuradon.tralon.agent.connector.WebsocketClientListener;
 import io.quarkus.logging.Log;
-import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.context.Dependent;
 
-@ApplicationScoped
+@Dependent
 @Binance
 @WebsocketClientFactory // Required for proper usage with Instance
 public class BinanceWebsocketClient implements WebsocketClient {

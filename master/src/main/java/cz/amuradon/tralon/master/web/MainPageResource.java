@@ -1,32 +1,23 @@
 package cz.amuradon.tralon.master.web;
 
-import java.io.IOException;
 import java.math.BigDecimal;
-import java.nio.file.Files;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentSkipListMap;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.function.TriFunction;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.resteasy.reactive.RestForm;
 
-import cz.amuradon.tralon.agent.connector.DataStoringRestClientDecorator;
-import cz.amuradon.tralon.agent.connector.DataStoringWebsocketClientListener;
 import cz.amuradon.tralon.agent.connector.Exchange;
 import cz.amuradon.tralon.agent.connector.RestClient;
-import cz.amuradon.tralon.agent.connector.RestClientFactory;
 import cz.amuradon.tralon.agent.connector.WebsocketClient;
-import cz.amuradon.tralon.agent.connector.WebsocketClientFactory;
 import cz.amuradon.tralon.agent.strategies.DualInvestmentSpotHedgeStrategy;
 import cz.amuradon.tralon.agent.strategies.Strategy;
+import cz.amuradon.tralon.agent.strategies.StrategyFactory;
 import cz.amuradon.tralon.agent.strategies.marketmaking.MarketMakingStrategy;
 import cz.amuradon.tralon.agent.strategies.marketmaking.SpreadStrategies;
 import cz.amuradon.tralon.agent.strategies.newlisting.ComputeInitialPrice;
@@ -34,7 +25,6 @@ import cz.amuradon.tralon.agent.strategies.newlisting.NewListingStrategy;
 import io.quarkus.logging.Log;
 import io.quarkus.qute.CheckedTemplate;
 import io.quarkus.qute.TemplateInstance;
-import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.GET;
@@ -50,34 +40,23 @@ public class MainPageResource {
 	private static final String SPOT_HEDGE = "Dual Investment Spot Hedge";
 	private static final String NEW_LISTING = "New Listing";
 
+	private final StrategyFactory strategyFactory;
+	
 	private final Map<String, Strategy> runningStrategies;
 	
 	private final List<String> supportedExchanges;
 	
-	private final Instance<RestClient> restClientFactory;
-	
-	private final Instance<WebsocketClient> websocketClientFactory;
-	
 	private final ScheduledExecutorService scheduler;
 	
-	private final ExecutorService executorService;
-	
-	private final String dataRootPath;
 	
 	// XXX As of now agent as dep, in future managed by Kubernetes #24
 	@Inject
-	public MainPageResource(@RestClientFactory Instance<RestClient> restClientFactory,
-			@WebsocketClientFactory Instance<WebsocketClient> websocketClientFactory,
-			final ScheduledExecutorService scheduler,
-			final ExecutorService executorService,
-			@ConfigProperty(name = "data.path") final String dataRootPath) {
+	public MainPageResource(final StrategyFactory strategyFactory,
+			final ScheduledExecutorService scheduler) {
+		this.strategyFactory = strategyFactory;
 		runningStrategies = new ConcurrentSkipListMap<>();
 		supportedExchanges = Arrays.stream(Exchange.values()).map(Exchange::displayName).collect(Collectors.toList());
-		this.restClientFactory = restClientFactory;
-		this.websocketClientFactory = websocketClientFactory;
 		this.scheduler = scheduler;
-		this.executorService = executorService;
-		this.dataRootPath = dataRootPath;
 	}
 	
 	@GET
@@ -181,7 +160,7 @@ public class MainPageResource {
 	 */
 	private TemplateInstance runStrategy(String exchangeName, String baseAsset, String quoteAsset,
 			boolean storeData,
-			TriFunction<RestClient, WebsocketClient, String, Strategy> strategyFactory) {
+			TriFunction<RestClient, WebsocketClient, String, Strategy> strategyCreation) {
 		final String id = strategyId(exchangeName, baseAsset, quoteAsset);
 		if (runningStrategies.containsKey(id)) {
 			String error = String.format("There is already running strategy for %s/%s on %s",
@@ -189,26 +168,7 @@ public class MainPageResource {
 			Log.error(error);
 			throw new BadRequestException(error);
 		}
-		final Exchange exchange = Exchange.fromDisplayName(exchangeName);
-		RestClient restClient =
-				restClientFactory.select(RestClientFactory.LITERAL, exchange.qualifier()).get();
-		final WebsocketClient websocketClient =
-				websocketClientFactory.select(WebsocketClientFactory.LITERAL, exchange.qualifier()).get();
-		
-		String symbol = exchange.symbol(baseAsset, quoteAsset);
-		if (storeData) {
-			String dateFolder = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-			java.nio.file.Path dataPath = java.nio.file.Path.of(dataRootPath, exchangeName, dateFolder, symbol);
-			try {
-				Files.createDirectories(dataPath);
-			} catch (IOException e) {
-				throw new IllegalStateException("Could not create data folders.", e);
-			}
-			restClient = new DataStoringRestClientDecorator(restClient, executorService, dataPath);
-			websocketClient.setListener(new DataStoringWebsocketClientListener(executorService, dataPath));
-		}
-
-		Strategy strategy = strategyFactory.apply(restClient, websocketClient, symbol);
+		Strategy strategy = strategyFactory.create(exchangeName, baseAsset, quoteAsset, storeData, strategyCreation);
 		strategy.start();
 		String strategyDescription = strategy.getDescription();
 		runningStrategies.put(id, strategy);

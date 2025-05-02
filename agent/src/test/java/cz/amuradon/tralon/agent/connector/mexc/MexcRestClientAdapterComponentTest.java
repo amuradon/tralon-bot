@@ -1,10 +1,15 @@
 package cz.amuradon.tralon.agent.connector.mexc;
 
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.concurrent.ExecutorService;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import cz.amuradon.tralon.agent.connector.DataStoringRestClientListener;
 import cz.amuradon.tralon.agent.connector.OrderBookResponse;
 import cz.amuradon.tralon.agent.connector.RestClientFactory;
 import io.quarkus.test.common.QuarkusTestResource;
@@ -20,8 +25,16 @@ public class MexcRestClientAdapterComponentTest {
 	@Inject
 	MexcRestClientAdapter client;
 	
+	@Inject
+	ExecutorService service;
+	
+	
+	
 	@Test
-	public void testOrderBook() {
+	public void testOrderBook() throws IOException {
+		Path dirs = Path.of("C:\\work\\tralon\\test-data");
+		Files.createDirectories(dirs);
+		client.setListener(new DataStoringRestClientListener(service, dirs));
 		OrderBookResponse orderResponse = client.orderBook("TKNUSDT");
 
 		Assertions.assertEquals(10050L, orderResponse.sequence());

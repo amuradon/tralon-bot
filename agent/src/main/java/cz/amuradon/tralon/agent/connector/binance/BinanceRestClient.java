@@ -25,12 +25,13 @@ import cz.amuradon.tralon.agent.connector.OrderBookResponse;
 import cz.amuradon.tralon.agent.connector.OrderBookResponseImpl;
 import cz.amuradon.tralon.agent.connector.RestClient;
 import cz.amuradon.tralon.agent.connector.RestClientFactory;
+import cz.amuradon.tralon.agent.connector.RestClientListener;
 import cz.amuradon.tralon.agent.model.Order;
 import io.quarkus.logging.Log;
-import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.context.Dependent;
 import jakarta.inject.Inject;
 
-@ApplicationScoped
+@Dependent
 @Binance
 @RestClientFactory // Required for proper usage with Instance
 public class BinanceRestClient implements RestClient {
@@ -131,6 +132,11 @@ public class BinanceRestClient implements RestClient {
 			throw new IllegalStateException("Could not read listen key.", e);
 		}
 	}
+	
+	@Override
+	public void setListener(RestClientListener listener) {
+		// TODO Implementovat az bude bez SDK v low-level
+	}
 
 	public final class BinanceNewOrderBuilder implements NewOrderBuilder {
 
@@ -213,5 +219,6 @@ public class BinanceRestClient implements RestClient {
 		}
 
 	}
+
 
 }

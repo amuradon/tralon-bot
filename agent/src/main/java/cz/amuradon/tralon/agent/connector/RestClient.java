@@ -15,7 +15,7 @@ public interface RestClient {
 	Map<String, Order> listOrders(String symbol);
 	
 	List<? extends AccountBalance> listBalances();
-			
+
 	OrderBookResponse orderBook(String symbol);
 
 	SymbolInfo cacheSymbolDetails(String symbol);
@@ -23,6 +23,8 @@ public interface RestClient {
 	NewOrderBuilder newOrder();
 
 	String userDataStream();
+	
+	void setListener(RestClientListener listener);
 
 	interface NewOrderBuilder {
 		NewOrderBuilder clientOrderId(String clientOrderId);
