@@ -46,8 +46,8 @@ public class KucoinRestClient implements RestClient {
 	}
 	
 	@Override
-	public NewOrderBuilder newOrder() {
-		return new KucoinNewOrderBuilder();
+	public NewOrderSymbolBuilder newOrder() {
+		return new KucoinNewOrderSymbolBuilder();
 	}
 	
 	@Override
@@ -119,12 +119,23 @@ public class KucoinRestClient implements RestClient {
 		// TODO Implementovat az bude bez SDK v low-level
 	}
 	
+	public final class KucoinNewOrderSymbolBuilder implements NewOrderSymbolBuilder {
+		@Override
+		public NewOrderBuilder symbol(String symbol) {
+			return new KucoinNewOrderBuilder(symbol);
+		}
+	}
 	public final class KucoinNewOrderBuilder implements NewOrderBuilder {
 		
 		private OrderCreateApiRequestBuilder builder = OrderCreateApiRequest.builder();
 		private String symbol;
 		private BigDecimal size;
 		private BigDecimal price;
+
+		public KucoinNewOrderBuilder(String symbol) {
+			this.symbol = symbol;
+			builder.symbol(symbol);
+		}
 
 		@Override
 		public NewOrderBuilder clientOrderId(String clientOrderId) {
@@ -135,13 +146,6 @@ public class KucoinRestClient implements RestClient {
 		@Override
 		public NewOrderBuilder side(Side side) {
 			builder.side(side.name().toLowerCase());
-			return this;
-		}
-
-		@Override
-		public NewOrderBuilder symbol(String symbol) {
-			builder.symbol(symbol);
-			this.symbol = symbol;
 			return this;
 		}
 

@@ -265,9 +265,9 @@ public class MarketMakingStrategy implements Strategy {
 		Log.infof("Placing new limit order - clOrdId: %s, side: %s, price: %s, size: %s",
 				clientOrderId, side, price, size);
 		String orderId = restClient.newOrder()
+				.symbol(symbol)
 				.clientOrderId(clientOrderId)
 				.side(side)
-				.symbol(symbol)
 				.price(price)
 				.size(size)
 				.type(OrderType.LIMIT)

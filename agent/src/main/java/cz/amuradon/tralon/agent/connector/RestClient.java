@@ -20,7 +20,7 @@ public interface RestClient {
 
 	SymbolInfo cacheSymbolDetails(String symbol);
 	
-	NewOrderBuilder newOrder();
+	NewOrderSymbolBuilder newOrder();
 
 	String userDataStream();
 	
@@ -29,7 +29,6 @@ public interface RestClient {
 	interface NewOrderBuilder {
 		NewOrderBuilder clientOrderId(String clientOrderId);
 		NewOrderBuilder side(Side side);
-		NewOrderBuilder symbol(String symbol);
 		NewOrderBuilder price(BigDecimal price);
 		NewOrderBuilder size(BigDecimal size);
 		NewOrderBuilder type(OrderType type);
@@ -37,6 +36,10 @@ public interface RestClient {
     	NewOrderBuilder recvWindow(long recvWindow);
     	NewOrderBuilder signParams();
 		NewOrderResponse send();
+	}
+	
+	interface NewOrderSymbolBuilder {
+		NewOrderBuilder symbol(String symbol);
 	}
 
 }

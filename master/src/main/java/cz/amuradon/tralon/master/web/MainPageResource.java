@@ -145,13 +145,32 @@ public class MainPageResource {
 			@RestForm int trailingStopDelayMs,
 			@RestForm int initialBuyOrderValidityMs,
 			@RestForm boolean storeData) {
-		System.out.println("*** Store data: " + storeData);
-		return runStrategy(exchangeName, baseAsset, quoteAsset, storeData,
-				(r, w, s) -> new NewListingStrategy(scheduler, r, w,
-				new ComputeInitialPrice(priceExpr), quoteQuantity, s, listingDateTime, buyOrderRequestsPerSecond,
-				buyOrderMaxAttempts, trailingStopBelow, trailingStopDelayMs, initialBuyOrderValidityMs));
+		boolean checked = logAndCheck("buyOrderRequestsPerSecond", buyOrderRequestsPerSecond);
+		checked &= logAndCheck("buyOrderMaxAttempts", buyOrderMaxAttempts);
+		checked &= logAndCheck("trailingStopBelow", trailingStopBelow);
+		checked &= logAndCheck("trailingStopDelayMs", trailingStopDelayMs);
+		checked &= logAndCheck("initialBuyOrderValidityMs", initialBuyOrderValidityMs);
+		Log.infof("storeData: %s", storeData);
+		if (checked) {
+			return runStrategy(exchangeName, baseAsset, quoteAsset, storeData,
+					(r, w, s) -> new NewListingStrategy(scheduler, r, w,
+					new ComputeInitialPrice(priceExpr), quoteQuantity, s, listingDateTime, buyOrderRequestsPerSecond,
+					buyOrderMaxAttempts, trailingStopBelow, trailingStopDelayMs, initialBuyOrderValidityMs));
+		} else {
+			return Templates.runningStrategies(runningStrategies);
+		}
 	}
 	
+	private boolean logAndCheck(String field, int value) {
+		if (value <= 0) {
+			Log.errorf("%s has invalid value: %d" , field, value);
+			return false;
+		} else {
+			Log.infof("%s: %d", field, value);
+			return true;
+		}
+	}
+
 	/* TODO
 	 * Error pri pokusu spustit bezici strategii se na webu nezobrazi, jen v logu diky Log
 	 * Input type="number" acceptuje pouze cela cisla

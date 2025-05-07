@@ -24,23 +24,30 @@
 	<label for="listingDateTime">Listing start:</label>
 	<input name="listingDateTime" type="datetime-local"/>
 	
-	<label for="requestsPerSecond">Retry requests per second:</label>
-	<input name="requestsPerSecond" type="number" />
+	<label for="buyOrderRequestsPerSecond" title="To avoid REST API limit breach. Depends on the speed of system and
+	 network but it might never reach that number of requests">
+		Maximum retry requests per second:
+	</label>
+	<input name="buyOrderRequestsPerSecond" type="number" value="20"/>
 
-	<label for="buyOrderMaxAttempts">Max retries:</label>
-	<input name="buyOrderMaxAttempts" type="number" />
+	<label for="buyOrderMaxAttempts" title="To overcome being too early as well as exchange congestion">
+		Total max count of retries:
+	</label>
+	<input name="buyOrderMaxAttempts" type="number" value="20"/>
 	
 	<label for="trailingStopBelow">Trailing stop below max price (%):</label>
-	<input name="trailingStopBelow" type="number" step="any" />
+	<input name="trailingStopBelow" type="number" step="any" value="25"/>
 	
 	<label for="trailingStopDelayMs">Trailing stop execution delay (ms):</label>
-	<input name="trailingStopDelayMs" type="number" />
+	<input name="trailingStopDelayMs" type="number" value="150"/>
 	
-	<label for="initialBuyOrderValidityMs">Validity interval of initial buy order (ms):</label>
-	<input name="initialBuyOrderValidityMs" type="number" />
+	<label for="initialBuyOrderValidityMs" title="To avoid buying remaining quantity if the price is already falling">
+		Validity period of initial buy order (ms):
+	</label>
+	<input name="initialBuyOrderValidityMs" type="number" value="500"/>
 	
 	<label for="storeData">Store Data:</label>
-	<input id="storeDataTrue" name="storeData" type="radio" value="true"/>
+	<input id="storeDataTrue" name="storeData" type="radio" value="true" checked="checked"/>
 	<label for="storeDataTrue">true</label>
 	<input id="storeDataFalse" name="storeData" type="radio" value="false"/>
 	<label for="storeDataFalse">false</label>

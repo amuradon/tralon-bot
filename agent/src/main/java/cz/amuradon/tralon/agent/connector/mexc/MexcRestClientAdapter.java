@@ -150,11 +150,11 @@ public class MexcRestClientAdapter implements RestClient {
 	}
 
 	@Override
-	public NewOrderBuilder newOrder() {
-		return new MexcNewOrderRequestBuilder();
+	public NewOrderSymbolBuilder newOrder() {
+		return new MexcNewOrderSymbolBuilder();
 	}
 
-	public Map<String, Object> signQueryParams(Map<String, Object> params) {
+	private Map<String, Object> signQueryParams(Map<String, Object> params) {
     	StringJoiner joiner = new StringJoiner("&");
     	for (Entry<String, Object> entry : params.entrySet()) {
 			joiner.add(entry.getKey() + "=" + entry.getValue());
@@ -174,14 +174,26 @@ public class MexcRestClientAdapter implements RestClient {
 		this.listener = listener;
 	}
 	
-	public class MexcNewOrderRequestBuilder implements NewOrderBuilder {
+	public class MexcNewOrderSymbolBuilder implements NewOrderSymbolBuilder {
+
+		@Override
+		public NewOrderBuilder symbol(String symbol) {
+			return new MexcNewOrderBuilder(symbol);
+		}
+		
+	}
+	
+	public class MexcNewOrderBuilder implements NewOrderBuilder {
     	
     	private static final String TIMESTAMP = "timestamp";
 		private Map<String, Object> params = new LinkedHashMap<>();
 		private boolean signed = false;
 		private String symbol;
-		private BigDecimal quantity;
-		private BigDecimal price;
+		
+		public MexcNewOrderBuilder(final String symbol) {
+			this.symbol = symbol;
+			params.put("symbol", symbol);
+		}
     	
 		@Override
 		public NewOrderBuilder clientOrderId(String clientOrderId) {
@@ -198,14 +210,6 @@ public class MexcRestClientAdapter implements RestClient {
     	}
 
 		@Override
-    	public NewOrderBuilder symbol(String symbol) {
-    		params.put("symbol", symbol);
-    		this.symbol = symbol;
-    		signed = false;
-    		return this;
-    	}
-
-		@Override
     	public NewOrderBuilder type(OrderType type) {
     		params.put("type", type.name());
     		signed = false;
@@ -213,15 +217,17 @@ public class MexcRestClientAdapter implements RestClient {
     	}
     	
 		@Override
-    	public NewOrderBuilder size(BigDecimal size) {
-    		this.quantity = size;
+    	public NewOrderBuilder size(BigDecimal quantity) {
+			Integer quantityScale = quantityScales.computeIfAbsent(symbol, k -> 2);
+			params.put("quantity", quantity.setScale(quantityScale, RoundingMode.HALF_UP).toPlainString());
     		signed = false;
     		return this;
     	}
    
 		@Override
     	public NewOrderBuilder price(BigDecimal price) {
-    		this.price = price;
+			Integer priceScale = priceScales.computeIfAbsent(symbol, k -> 2);
+			params.put("price", price.setScale(priceScale, RoundingMode.HALF_UP).toPlainString());
     		signed = false;
     		return this;
     	}
@@ -249,16 +255,6 @@ public class MexcRestClientAdapter implements RestClient {
     	
 		@Override
     	public NewOrderResponse send() {
-    		if (symbol == null) {
-				throw new IllegalArgumentException("Could not send order - symbol is missing.");
-			}
-			
-			Integer quantityScale = quantityScales.get(symbol);
-			params.put("quantity", quantity.setScale(quantityScale, RoundingMode.HALF_UP).toPlainString());
-
-			Integer priceScale = priceScales.get(symbol);
-			params.put("price", price.setScale(priceScale, RoundingMode.HALF_UP).toPlainString());
-			
     		if (params.get(TIMESTAMP) == null) {
     			params.put(TIMESTAMP, String.valueOf(new Date().getTime()));
     			signed = false;

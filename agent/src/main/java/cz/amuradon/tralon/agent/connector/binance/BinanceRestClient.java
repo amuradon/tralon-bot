@@ -52,8 +52,8 @@ public class BinanceRestClient implements RestClient {
 	}
 	
 	@Override
-	public NewOrderBuilder newOrder() {
-		return new BinanceNewOrderBuilder();
+	public NewOrderSymbolBuilder newOrder() {
+		return new BinanceNewOrderSymbolBuilder();
 	}
 
 	@Override
@@ -138,6 +138,15 @@ public class BinanceRestClient implements RestClient {
 		// TODO Implementovat az bude bez SDK v low-level
 	}
 
+	public final class BinanceNewOrderSymbolBuilder implements NewOrderSymbolBuilder {
+
+		@Override
+		public NewOrderBuilder symbol(String symbol) {
+			return new BinanceNewOrderBuilder(symbol);
+		}
+
+	}
+
 	public final class BinanceNewOrderBuilder implements NewOrderBuilder {
 
 		private final Map<String, Object> parameters = new HashMap<>();
@@ -145,6 +154,11 @@ public class BinanceRestClient implements RestClient {
 		private BigDecimal quantity;
 		private BigDecimal price;
 		
+		public BinanceNewOrderBuilder(String symbol) {
+			this.symbol = symbol;
+			parameters.put("symbol", symbol);
+		}
+
 		@Override
 		public NewOrderBuilder clientOrderId(String clientOrderId) {
 			parameters.put("newClientOrderId", clientOrderId);
@@ -154,13 +168,6 @@ public class BinanceRestClient implements RestClient {
 		@Override
 		public NewOrderBuilder side(Side side) {
 			parameters.put("side", side.name());
-			return this;
-		}
-
-		@Override
-		public NewOrderBuilder symbol(String symbol) {
-			parameters.put("symbol", symbol);
-			this.symbol = symbol;
 			return this;
 		}
 

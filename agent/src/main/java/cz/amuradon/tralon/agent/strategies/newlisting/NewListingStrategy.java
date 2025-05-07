@@ -7,12 +7,9 @@ import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.HexFormat;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import cz.amuradon.tralon.agent.OrderStatus;
 import cz.amuradon.tralon.agent.OrderType;
@@ -122,7 +119,8 @@ public class NewListingStrategy implements Strategy {
 		Log.infof("Listing at %d:%d", listingHour, listingMinute);
 		Log.infof("Agent starts at %d:%d", startHour, startMinute);
 		
-		LocalDateTime beforeStart = LocalDateTime.now().withHour(startHour).withMinute(startMinute).withSecond(50);
+		LocalDateTime beforeStart = LocalDateTime.now().withHour(startHour).withMinute(startMinute)
+				.withSecond(50).withNano(0);
 		Log.infof("Listing start: %s", beforeStart);
 		LocalDateTime now = LocalDateTime.now();
 		
@@ -193,8 +191,8 @@ public class NewListingStrategy implements Strategy {
 		
 		int recvWindow = 60000;
 		RestClient.NewOrderBuilder newOrderBuilder = restClient.newOrder()
-			.clientOrderId(clientOrderId)
 			.symbol(symbol)
+			.clientOrderId(clientOrderId)
 			.side(Side.BUY)
 			.type(OrderType.LIMIT)
 			// FIXME quantity je spocitana na tu max price!!! 

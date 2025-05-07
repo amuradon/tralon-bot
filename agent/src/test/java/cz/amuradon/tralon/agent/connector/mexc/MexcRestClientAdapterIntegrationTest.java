@@ -18,7 +18,7 @@ import jakarta.inject.Inject;
 
 @QuarkusTest
 @QuarkusTestResource(MexcExchangeMock.class)
-public class MexcRestClientAdapterComponentTest {
+public class MexcRestClientAdapterIntegrationTest {
 
 	@Mexc
 	@RestClientFactory
@@ -27,8 +27,6 @@ public class MexcRestClientAdapterComponentTest {
 	
 	@Inject
 	ExecutorService service;
-	
-	
 	
 	@Test
 	public void testOrderBook() throws IOException {

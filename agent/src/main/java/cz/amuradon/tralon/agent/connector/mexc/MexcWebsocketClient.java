@@ -114,6 +114,7 @@ public class MexcWebsocketClient implements WebsocketClient {
 				String channel = channelNode.asText();
 				final String symbol = tree.get("s").asText();
 				if (depthUpdatesChannel.equalsIgnoreCase(channel)) {
+					Log.infof("OB: ", message);
 					listener.onOrderBookUpdate(symbol, message);
 					orderBookChangeCallback.accept(mapper.treeToValue(data, MexcOrderBookChange.class));
 				} else if (tradeUpdatesChannel.equalsIgnoreCase(channel)) {

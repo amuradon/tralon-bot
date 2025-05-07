@@ -38,6 +38,7 @@ import cz.amuradon.tralon.agent.connector.InvalidPrice;
 import cz.amuradon.tralon.agent.connector.NewOrderError;
 import cz.amuradon.tralon.agent.connector.NewOrderResponse;
 import cz.amuradon.tralon.agent.connector.RestClient;
+import cz.amuradon.tralon.agent.connector.TradeDirectionNotAllowed;
 import cz.amuradon.tralon.agent.connector.WebsocketClient;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
@@ -63,6 +64,9 @@ public class NewListingStrategyTest {
 	private RestClient.NewOrderBuilder newOrderBuilderMock;
 	
 	@Mock
+	private RestClient.NewOrderSymbolBuilder newOrderSymbolBuilderMock;
+	
+	@Mock
 	private ScheduledExecutorService scheduledExecutorServiceMock;
 	
 	@Mock
@@ -75,7 +79,8 @@ public class NewListingStrategyTest {
 	
 	@BeforeEach
 	public void prepare() {
-		when(restClientMock.newOrder()).thenReturn(newOrderBuilderMock);
+		when(newOrderSymbolBuilderMock.symbol(anyString())).thenReturn(newOrderBuilderMock);
+		when(restClientMock.newOrder()).thenReturn(newOrderSymbolBuilderMock);
 		when(scheduledExecutorServiceMock.schedule(any(Runnable.class), anyLong(), any(TimeUnit.class)))
 			.thenAnswer(i -> {
 				i.getArgument(0, Runnable.class).run();
@@ -121,7 +126,7 @@ public class NewListingStrategyTest {
 	
 	@Test
 	public void tradeDirectionNotAllowed() throws Exception {
-		mockNewOrderException(429, (e, r) -> new NewOrderError(e, r));
+		mockNewOrderException(400, (e, r) -> new TradeDirectionNotAllowed(e, r));
 		
 		strategy.start();
 		
