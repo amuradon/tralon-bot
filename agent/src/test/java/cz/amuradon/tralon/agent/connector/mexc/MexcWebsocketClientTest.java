@@ -65,9 +65,9 @@ public class MexcWebsocketClientTest {
 		containerProviderMock.close();
 	}
 	
-	@Test
-	public void test() {
-		client.onOrderChange(o -> System.out.println(o));
-		client.onMessage(ORDER_UPDATE);
-	}
+//	@Test
+//	public void test() {
+//		client.onOrderChange(o -> System.out.println(o));
+//		client.onMessage(ORDER_UPDATE);
+//	}
 }

@@ -3,22 +3,22 @@ package cz.amuradon.tralon.agent.connector;
 public class NoopWebsocketClientListener implements WebsocketClientListener {
 
 	@Override
-	public void onOrderBookUpdate(String symbol, String message) {
+	public void onOrderBookUpdate(String symbol, byte[] message) {
 		// No-op
 	}
 
 	@Override
-	public void onTrade(String symbol, String message) {
+	public void onTrade(String symbol, byte[] message) {
 		// No-op
 	}
 
 	@Override
-	public void onAccountBalanceUpdate(String message) {
+	public void onAccountBalanceUpdate(byte[] message) {
 		// No-op
 	}
 
 	@Override
-	public void onOrderUpdate(String message) {
+	public void onOrderUpdate(byte[] message) {
 		// No-op
 	}
 

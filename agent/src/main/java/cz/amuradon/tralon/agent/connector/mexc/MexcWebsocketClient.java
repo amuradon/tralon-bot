@@ -6,10 +6,11 @@ import java.util.function.Consumer;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-import com.fasterxml.jackson.databind.InjectableValues;
-import com.fasterxml.jackson.databind.InjectableValues.Std;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.mxc.push.common.protobuf.PublicAggreDealsV3ApiItem;
+import com.mxc.push.common.protobuf.PushDataV3ApiWrapper;
 
 import cz.amuradon.tralon.agent.connector.AccountBalance;
 import cz.amuradon.tralon.agent.connector.NoopWebsocketClientListener;
@@ -35,13 +36,13 @@ import jakarta.websocket.Session;
 @WebsocketClientFactory // Required for proper usage with Instance
 public class MexcWebsocketClient implements WebsocketClient {
 	
-	private static final String SPOT_TRADE_UPDATES_CHANNEL_PREFIX = "spot@public.deals.v3.api@";
+	private static final String SPOT_TRADE_UPDATES_CHANNEL_PREFIX = "spot@public.aggre.deals.v3.api.pb@10ms@";
 	
-	private static final String SPOT_DEPTH_UPDATES_CHANNEL_PREFIX = "spot@public.increase.depth.v3.api@";
+	private static final String SPOT_DEPTH_UPDATES_CHANNEL_PREFIX = "spot@public.aggre.depth.v3.api.pb@10ms@";
 
-	private static final String SPOT_ACCOUNT_UPDATES_CHANNEL = "spot@private.account.v3.api";
+	private static final String SPOT_ACCOUNT_UPDATES_CHANNEL = "spot@private.account.v3.api.pb";
 
-	private static final String SPOT_ORDER_UPDATES_CHANNEL = "spot@private.orders.v3.api";
+	private static final String SPOT_ORDER_UPDATES_CHANNEL = "spot@private.orders.v3.api.pb";
 
 	private final String baseUri;
 	
@@ -94,7 +95,9 @@ public class MexcWebsocketClient implements WebsocketClient {
 	}
 	
 	private void subscribe(String channel) {
+		Log.infof("Subscribing: %s", channel);
 		try {
+			// TODO validovat, jestli kanalu byla uspesna 
 			session.getBasicRemote().sendText(String.format(
 					"{ \"method\":\"SUBSCRIPTION\", \"params\":[\"%s\"] }",
 					channel));
@@ -103,39 +106,44 @@ public class MexcWebsocketClient implements WebsocketClient {
 		}
 	}
 	
-	// TODO unit test unmarshalling
 	@OnMessage
 	public void onMessage(String message) {
+		Log.infof("Message: %s", message);
 		try {
 			JsonNode tree = mapper.readTree(message);
-			JsonNode channelNode = tree.get("c");
-			JsonNode data = tree.get("d");
-			if (channelNode != null) {
-				String channel = channelNode.asText();
-				final String symbol = tree.get("s").asText();
-				if (depthUpdatesChannel.equalsIgnoreCase(channel)) {
-					Log.infof("OB: ", message);
-					listener.onOrderBookUpdate(symbol, message);
-					orderBookChangeCallback.accept(mapper.treeToValue(data, MexcOrderBookChange.class));
-				} else if (tradeUpdatesChannel.equalsIgnoreCase(channel)) {
-					listener.onTrade(symbol, message);
-					MexcTradeEventData dealsData = mapper.treeToValue(data, MexcTradeEventData.class);
-					for (Trade trade : dealsData.deals()) {
-						tradeCallback.accept(trade);
-					}
-				} else if (SPOT_ACCOUNT_UPDATES_CHANNEL.equalsIgnoreCase(channel)) {
-					listener.onAccountBalanceUpdate(message);
-					accountBalanceCallback.accept(mapper.treeToValue(data, MexcAccountBalanceUpdate.class));
-				} else if (SPOT_ORDER_UPDATES_CHANNEL.equalsIgnoreCase(channel)) {
-					listener.onOrderUpdate(message);
-					Std values = new InjectableValues.Std();
-					values.addValue("symbol", symbol);
-					orderChangeCallback.accept(mapper.readerFor(MexcOrderChange.class).with(values).readValue(data));
-				}
+			JsonNode msg = tree.get("msg");
+			if (msg != null && msg.asText().startsWith("Not")) {
+				throw new IllegalStateException("Websocket subscription failed: " + message);
 			}
 		} catch (IOException e) {
 			Log.error("The Websocket client could not parse JSON.", e);
 		} 
+	}
+
+	// TODO unit test unmarshalling
+	@OnMessage
+	public void onMessage(byte[] message) {
+		try {
+			PushDataV3ApiWrapper data = PushDataV3ApiWrapper.parseFrom(message);
+			final String symbol = data.getSymbol();
+			if (data.getChannel().equalsIgnoreCase(depthUpdatesChannel)) {
+				listener.onOrderBookUpdate(symbol, message);
+				orderBookChangeCallback.accept(new MexcOrderBookChange(data.getPublicAggreDepths()));
+			} else if (data.getChannel().equalsIgnoreCase(tradeUpdatesChannel)) {
+				listener.onTrade(symbol, message);
+				for (PublicAggreDealsV3ApiItem trade : data.getPublicAggreDeals().getDealsList()) {
+					tradeCallback.accept(new MexcTrade(trade));
+				}
+			} else if (data.getChannel().equalsIgnoreCase(SPOT_ACCOUNT_UPDATES_CHANNEL)) {
+				listener.onAccountBalanceUpdate(message);
+				accountBalanceCallback.accept(new MexcAccountBalanceUpdate(data.getPrivateAccount()));
+			} else if (data.getChannel().equalsIgnoreCase(SPOT_ORDER_UPDATES_CHANNEL)) {
+				listener.onOrderUpdate(message);
+				orderChangeCallback.accept(new MexcOrderChange(symbol, data.getPrivateOrders()));
+			}
+		} catch (InvalidProtocolBufferException e) {
+			Log.error("The Websocket client could not parse Protobuf.", e);
+		}
 	}
 
 	@Override

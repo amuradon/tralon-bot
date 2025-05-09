@@ -17,10 +17,10 @@ public class DataStoringBase {
 		this.dataPath = dataPath;
 	}
 	
-	void writeToFile(String message, String fileName) {
+	void writeToFile(byte[] message, String fileName) {
 		executorService.execute(() -> {
 			try {
-				Files.writeString(dataPath.resolve(fileName),
+				Files.write(dataPath.resolve(fileName),
 						message,
 						StandardOpenOption.CREATE);
 			} catch (IOException e) {

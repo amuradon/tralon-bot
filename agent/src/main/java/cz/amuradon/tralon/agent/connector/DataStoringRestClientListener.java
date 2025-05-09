@@ -1,5 +1,6 @@
 package cz.amuradon.tralon.agent.connector;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.concurrent.ExecutorService;
 
@@ -11,12 +12,12 @@ public class DataStoringRestClientListener extends DataStoringBase implements Re
 
 	@Override
 	public void onOrderBook(String symbol, String message) {
-		writeToFile(message, "depth.json");
+		writeToFile(message.getBytes(StandardCharsets.UTF_8), "depth.json");
 	}
 
 	@Override
 	public void onExchangeInfo(String symbol, String message) {
-		writeToFile(message, "exchangeInfo.json");
+		writeToFile(message.getBytes(StandardCharsets.UTF_8), "exchangeInfo.json");
 	}
 
 }

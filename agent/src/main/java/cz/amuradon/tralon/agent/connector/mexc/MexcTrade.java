@@ -2,18 +2,37 @@ package cz.amuradon.tralon.agent.connector.mexc;
 
 import java.math.BigDecimal;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
+import com.mxc.push.common.protobuf.PublicAggreDealsV3ApiItem;
 
 import cz.amuradon.tralon.agent.Side;
 import cz.amuradon.tralon.agent.connector.Trade;
 
-@JsonIgnoreProperties(ignoreUnknown = true)
-public record MexcTrade(
-		@JsonProperty("p") BigDecimal price,
-		@JsonProperty("v") BigDecimal quantity,
-		@JsonProperty("S") Side side,
-		@JsonProperty("t") long timestamp
-		) implements Trade {
+public class MexcTrade implements Trade {
 
+	private final PublicAggreDealsV3ApiItem trade;
+	
+	public MexcTrade(PublicAggreDealsV3ApiItem trade) {
+		this.trade = trade;
+	}
+
+	public BigDecimal price() {
+		return new BigDecimal(trade.getPrice());
+	}
+	
+	public BigDecimal quantity() {
+		return new BigDecimal(trade.getQuantity());
+	}
+	
+	public Side side() {
+		return Side.values()[trade.getTradeType() - 1];
+	}
+	
+	public long timestamp() {
+		return trade.getTime();
+	}
+	
+	@Override
+	public String toString() {
+		return String.format("%s{%s}", getClass().getSimpleName(), trade);
+	}
 }

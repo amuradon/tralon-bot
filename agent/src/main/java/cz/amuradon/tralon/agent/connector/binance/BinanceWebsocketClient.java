@@ -1,5 +1,6 @@
 package cz.amuradon.tralon.agent.connector.binance;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -59,12 +60,12 @@ public class BinanceWebsocketClient implements WebsocketClient {
 					JsonNode tree = mapper.readTree(event);
 					String eventType = tree.get("e").asText();
 					if ("outboundAccountPosition".equalsIgnoreCase(eventType)) {
-						listener.onAccountBalanceUpdate(event);
+						listener.onAccountBalanceUpdate(event.getBytes(StandardCharsets.UTF_8));
 						mapper.treeToValue(tree.get("B"), new TypeReference<List<BinanceAccountBalanceUpdate>>() { })
 							.stream().forEach(b -> accountBalanceCallback.accept(b));
 						
 					} else if ("executionReport".equalsIgnoreCase(eventType)) {
-						listener.onOrderUpdate(event);
+						listener.onOrderUpdate(event.getBytes(StandardCharsets.UTF_8));
 						orderChangeCallback.accept(mapper.readValue(event, BinanceOrderChange.class));
 					}
 				} catch (JsonProcessingException e) {
@@ -97,7 +98,7 @@ public class BinanceWebsocketClient implements WebsocketClient {
 		}
 		client.diffDepthStream(symbol, 100, data -> {
 			try {
-				listener.onOrderBookUpdate(symbol, data);
+				listener.onOrderBookUpdate(symbol, data.getBytes(StandardCharsets.UTF_8));
 				callback.accept(mapper.readValue(data, BinanceOrderBookChange.class));
 			} catch (JsonProcessingException e) {
 				throw new IllegalStateException("Could not parse Websocket JSON", e);
@@ -120,7 +121,7 @@ public class BinanceWebsocketClient implements WebsocketClient {
 		}
 		client.tradeStream(symbol, data -> {
 			try {
-				listener.onTrade(symbol, data);
+				listener.onTrade(symbol, data.getBytes(StandardCharsets.UTF_8));
 				callback.accept(mapper.readValue(data, BinanaceTrade.class));
 			} catch (JsonProcessingException e) {
 				throw new IllegalStateException("Could not parse Websocket JSON", e);

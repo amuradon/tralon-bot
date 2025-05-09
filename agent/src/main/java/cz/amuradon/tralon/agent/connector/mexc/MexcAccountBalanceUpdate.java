@@ -2,16 +2,31 @@ package cz.amuradon.tralon.agent.connector.mexc;
 
 import java.math.BigDecimal;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
+import com.mxc.push.common.protobuf.PrivateAccountV3Api;
 
 import cz.amuradon.tralon.agent.connector.AccountBalance;
 
 /**
  * Used for Websocket update message.
  */
-@JsonIgnoreProperties(ignoreUnknown = true)
-public record MexcAccountBalanceUpdate(@JsonProperty("a") String asset,
-		@JsonProperty("f") BigDecimal available) implements AccountBalance {
+public class MexcAccountBalanceUpdate implements AccountBalance {
 
+	private final PrivateAccountV3Api privateAccount;
+	
+	public MexcAccountBalanceUpdate(PrivateAccountV3Api privateAccount) {
+		this.privateAccount = privateAccount;
+	}
+
+	public String asset() {
+		return privateAccount.getVcoinName();
+	}
+	
+	public BigDecimal available() {
+		return new BigDecimal(privateAccount.getBalanceAmount());
+	}
+	
+	@Override
+	public String toString() {
+		return String.format("%s{%s}", getClass().getSimpleName(), privateAccount);
+	}
 }
