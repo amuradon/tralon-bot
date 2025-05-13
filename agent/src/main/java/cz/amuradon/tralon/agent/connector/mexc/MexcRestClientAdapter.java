@@ -140,7 +140,7 @@ public class MexcRestClientAdapter implements RestClient {
 			ExchangeInfo exchnageInfo = objectMapper.readValue(response, ExchangeInfo.class);
 			SymbolInfo symbolInfo = exchnageInfo.symbols().get(0);
 			
-			quantityScales.put(symbol, symbolInfo.baseSizePrecision().stripTrailingZeros().scale());
+			quantityScales.put(symbol, symbolInfo.baseAssetPrecision());
 			int priceScale = symbolInfo.quoteAssetPrecision();
 			priceScales.put(symbol, priceScale);
 			return new cz.amuradon.tralon.agent.connector.SymbolInfo(priceScale);

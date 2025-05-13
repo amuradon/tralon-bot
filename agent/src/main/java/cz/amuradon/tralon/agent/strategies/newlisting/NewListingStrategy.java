@@ -103,6 +103,16 @@ public class NewListingStrategy implements Strategy {
     	listingHour = listingDateTime.getHour();
     	listingMinute = listingDateTime.getMinute();
     }
+    
+    /*
+     * FIXME
+     * - pri cene 75 a USDT qty 20 dostanu base qty 0 
+     * - kdyz se upravila cena na novy max, selhal signature
+     * - nedostavam order book updates nebo se minimalne neukladaji do souboru
+     * - websocket sessions se zdaji byt oddelene - 2 tokeny soucasne, ale otazka, zda to dokazu ten PB pak zpracovavat
+     * - nez se strategie rozjede, neni vypsana v seznamu
+     * - kdyz strategii pustim, mel by se vycistit formular
+     */
 	
 	@Override
 	public void start() {
@@ -157,6 +167,7 @@ public class NewListingStrategy implements Strategy {
 	private void prepare() {
 		/*
 		 * TODO
+		 * - Validace, zda dany asset existuje
 		 * - When application starts delete all existing listenKeys
 		 *   - I can't there might be more agents running at the same time
 		 * - Every 60 minutes sent keep alive request
@@ -167,6 +178,10 @@ public class NewListingStrategy implements Strategy {
 		symbolInfo = restClient.cacheSymbolDetails(symbol);
 		websocketClient.onTrade(this::processTradeUpdate, symbol);
 		websocketClient.onOrderChange(this::processOrderUpdate);
+		websocketClient.onAccountBalance(b -> Log.infof("Account balance update: {}", b));
+		
+		// XXX Subscribe to store to file
+		websocketClient.onOrderBookChange(c -> {}, symbol);
 		
 		// get order book
 		OrderBookResponse orderBookResponse = restClient.orderBook(symbol);
@@ -250,13 +265,14 @@ public class NewListingStrategy implements Strategy {
 	}
 	
 	private void processTradeUpdate(Trade trade) {
+		BigDecimal price = trade.price();
+		if (price.compareTo(maxPrice) > 0) {
+			maxPrice = trade.price();
+			stopPrice = maxPrice.multiply(new BigDecimal(100 - trailingStopBelow))
+					.divide(new BigDecimal(100), symbolInfo.priceScale(), RoundingMode.DOWN);
+		}
+
 		if (positionOpened) {
-			BigDecimal price = trade.price();
-			if (price.compareTo(maxPrice) > 0) {
-				maxPrice = trade.price();
-				stopPrice = maxPrice.multiply(new BigDecimal(100 - trailingStopBelow))
-						.divide(new BigDecimal(100), symbolInfo.priceScale(), RoundingMode.DOWN);
-			}
 			
 			// Caution: market order does not work in first (one?) minute, it is immediately cancelled
 			if (price.compareTo(stopPrice) <= 0) {
@@ -293,7 +309,7 @@ public class NewListingStrategy implements Strategy {
 	}
 	
 	private void processOrderUpdate(OrderChange orderChange) {
-		
+		Log.infof("Order update: {}", orderChange);
 		if (orderChange.clientOrderId().equalsIgnoreCase(buyClientOrderId)){
 			if (orderChange.status() == OrderStatus.PARTIALLY_FILLED) {
 				positionOpened = true;
