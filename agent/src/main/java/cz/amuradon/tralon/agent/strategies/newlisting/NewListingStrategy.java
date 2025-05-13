@@ -106,10 +106,10 @@ public class NewListingStrategy implements Strategy {
     
     /*
      * FIXME
-     * - pri cene 75 a USDT qty 20 dostanu base qty 0 
      * - kdyz se upravila cena na novy max, selhal signature
-     * - nedostavam order book updates nebo se minimalne neukladaji do souboru
-     * - websocket sessions se zdaji byt oddelene - 2 tokeny soucasne, ale otazka, zda to dokazu ten PB pak zpracovavat
+     * - je mozne ten PB pak zpracovavat, kdyz je takhle nahazeny do souboru? ukladat jako JSON?
+     *    - writeDelimitedTo(OutputStream)
+     * - websocket sessions se zdaji byt oddelene - 2 tokeny soucasne
      * - nez se strategie rozjede, neni vypsana v seznamu
      * - kdyz strategii pustim, mel by se vycistit formular
      */

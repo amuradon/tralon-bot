@@ -22,7 +22,7 @@ public class DataStoringBase {
 			try {
 				Files.write(dataPath.resolve(fileName),
 						message,
-						StandardOpenOption.CREATE);
+						StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.APPEND);
 			} catch (IOException e) {
 				throw new IllegalStateException("Could not write to file", e);
 			}

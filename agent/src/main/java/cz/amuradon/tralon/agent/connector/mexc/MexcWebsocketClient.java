@@ -1,5 +1,6 @@
 package cz.amuradon.tralon.agent.connector.mexc;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.util.function.Consumer;
@@ -126,22 +127,27 @@ public class MexcWebsocketClient implements WebsocketClient {
 		try {
 			PushDataV3ApiWrapper data = PushDataV3ApiWrapper.parseFrom(message);
 			final String symbol = data.getSymbol();
+			ByteArrayOutputStream bytesStream = new ByteArrayOutputStream();
+			data.writeDelimitedTo(bytesStream);
 			if (data.getChannel().equalsIgnoreCase(depthUpdatesChannel)) {
-				listener.onOrderBookUpdate(symbol, message);
+				// XXX Funguje to? Offloadovat do dalsi thread?
+				listener.onOrderBookUpdate(symbol, bytesStream.toByteArray());
 				orderBookChangeCallback.accept(new MexcOrderBookChange(data.getPublicAggreDepths()));
 			} else if (data.getChannel().equalsIgnoreCase(tradeUpdatesChannel)) {
-				listener.onTrade(symbol, message);
+				listener.onTrade(symbol, bytesStream.toByteArray());
 				for (PublicAggreDealsV3ApiItem trade : data.getPublicAggreDeals().getDealsList()) {
 					tradeCallback.accept(new MexcTrade(trade));
 				}
 			} else if (data.getChannel().equalsIgnoreCase(SPOT_ACCOUNT_UPDATES_CHANNEL)) {
-				listener.onAccountBalanceUpdate(message);
+				listener.onAccountBalanceUpdate(bytesStream.toByteArray());
 				accountBalanceCallback.accept(new MexcAccountBalanceUpdate(data.getPrivateAccount()));
 			} else if (data.getChannel().equalsIgnoreCase(SPOT_ORDER_UPDATES_CHANNEL)) {
-				listener.onOrderUpdate(message);
+				listener.onOrderUpdate(bytesStream.toByteArray());
 				orderChangeCallback.accept(new MexcOrderChange(symbol, data.getPrivateOrders()));
 			}
 		} catch (InvalidProtocolBufferException e) {
+			Log.error("The Websocket client could not parse Protobuf.", e);
+		} catch (IOException e) {
 			Log.error("The Websocket client could not parse Protobuf.", e);
 		}
 	}
