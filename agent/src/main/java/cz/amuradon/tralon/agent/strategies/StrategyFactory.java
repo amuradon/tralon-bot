@@ -61,7 +61,8 @@ public class StrategyFactory {
 				throw new IllegalStateException("Could not create data folders.", e);
 			}
 			restClient.setListener(new DataStoringRestClientListener(executorService, dataPath));
-			websocketClient.setListener(new DataStoringWebsocketClientListener(executorService, dataPath));
+			websocketClient.setListener(new DataStoringWebsocketClientListener(executorService, dataPath,
+					exchange.getWebsocketDataFileExtesion()));
 		}
 
 		return strategyCreation.apply(restClient, websocketClient, symbol);

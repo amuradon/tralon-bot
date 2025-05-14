@@ -107,8 +107,6 @@ public class NewListingStrategy implements Strategy {
     /*
      * FIXME
      * - kdyz se upravila cena na novy max, selhal signature
-     * - je mozne ten PB pak zpracovavat, kdyz je takhle nahazeny do souboru? ukladat jako JSON?
-     *    - writeDelimitedTo(OutputStream)
      * - websocket sessions se zdaji byt oddelene - 2 tokeny soucasne
      * - nez se strategie rozjede, neni vypsana v seznamu
      * - kdyz strategii pustim, mel by se vycistit formular
@@ -178,7 +176,7 @@ public class NewListingStrategy implements Strategy {
 		symbolInfo = restClient.cacheSymbolDetails(symbol);
 		websocketClient.onTrade(this::processTradeUpdate, symbol);
 		websocketClient.onOrderChange(this::processOrderUpdate);
-		websocketClient.onAccountBalance(b -> Log.infof("Account balance update: {}", b));
+		websocketClient.onAccountBalance(b -> Log.infof("Account balance update: %s", b));
 		
 		// XXX Subscribe to store to file
 		websocketClient.onOrderBookChange(c -> {}, symbol);
@@ -309,7 +307,7 @@ public class NewListingStrategy implements Strategy {
 	}
 	
 	private void processOrderUpdate(OrderChange orderChange) {
-		Log.infof("Order update: {}", orderChange);
+		Log.infof("Order update: %s", orderChange);
 		if (orderChange.clientOrderId().equalsIgnoreCase(buyClientOrderId)){
 			if (orderChange.status() == OrderStatus.PARTIALLY_FILLED) {
 				positionOpened = true;

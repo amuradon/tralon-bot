@@ -3,6 +3,11 @@ package cz.amuradon.tralon.agent.connector.mexc;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.util.concurrent.ExecutorService;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,13 +20,15 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
+import com.mxc.push.common.protobuf.PushDataV3ApiWrapper;
+
 import cz.amuradon.tralon.agent.connector.RestClient;
-import cz.amuradon.tralon.agent.connector.mexc.MexcWebsocketClient;
 import jakarta.websocket.ContainerProvider;
 import jakarta.websocket.RemoteEndpoint.Basic;
 import jakarta.websocket.Session;
 import jakarta.websocket.WebSocketContainer;
 
+// TODO uz to neni JSON, ale PB
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 public class MexcWebsocketClientTest {
@@ -70,4 +77,13 @@ public class MexcWebsocketClientTest {
 //		client.onOrderChange(o -> System.out.println(o));
 //		client.onMessage(ORDER_UPDATE);
 //	}
+	
+	@Test
+	public void readPbFromFiles() throws Exception {
+		FileInputStream input = new FileInputStream("C:\\work\\tralon\\data\\MEXC\\20250514\\BELUGAUSDT\\trades.pb");
+		while (input.available() > 0) {
+			System.out.println(PushDataV3ApiWrapper.parseDelimitedFrom(input));
+		}
+		
+	}
 }

@@ -15,7 +15,12 @@ public enum Exchange {
 			return baseAsset + "-" + quoteAsset;
 		}
 	},
-	MEXC("MEXC", Mexc.LITERAL);
+	MEXC("MEXC", Mexc.LITERAL) {
+		@Override
+		public String getWebsocketDataFileExtesion() {
+			return "pb";
+		}
+	};
 	
 	private final String displayName;
 	private final Annotation qualifier;
@@ -44,5 +49,9 @@ public enum Exchange {
 	
 	public String symbol(String baseAsset, String quoteAsset) {
 		return baseAsset + quoteAsset;
+	}
+
+	public String getWebsocketDataFileExtesion() {
+		return "json";
 	}
 }

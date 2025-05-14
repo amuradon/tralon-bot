@@ -81,6 +81,17 @@ public class MexcWebsocketClient implements WebsocketClient {
 	
 	public void setListener(WebsocketClientListener listener) {
 		this.listener = listener;
+		listener.setTransformer(b -> {
+			try {
+				PushDataV3ApiWrapper data = PushDataV3ApiWrapper.parseFrom(b);
+				ByteArrayOutputStream bytesStream = new ByteArrayOutputStream();
+				data.writeDelimitedTo(bytesStream);
+				return bytesStream.toByteArray();
+			} catch (IOException e) {
+				Log.error("Could not write PB message", e);
+				return new byte[0];
+			}
+		});
 	}
 	
 	private void connect() {
@@ -127,27 +138,22 @@ public class MexcWebsocketClient implements WebsocketClient {
 		try {
 			PushDataV3ApiWrapper data = PushDataV3ApiWrapper.parseFrom(message);
 			final String symbol = data.getSymbol();
-			ByteArrayOutputStream bytesStream = new ByteArrayOutputStream();
-			data.writeDelimitedTo(bytesStream);
 			if (data.getChannel().equalsIgnoreCase(depthUpdatesChannel)) {
-				// XXX Funguje to? Offloadovat do dalsi thread?
-				listener.onOrderBookUpdate(symbol, bytesStream.toByteArray());
+				listener.onOrderBookUpdate(symbol, message);
 				orderBookChangeCallback.accept(new MexcOrderBookChange(data.getPublicAggreDepths()));
 			} else if (data.getChannel().equalsIgnoreCase(tradeUpdatesChannel)) {
-				listener.onTrade(symbol, bytesStream.toByteArray());
+				listener.onTrade(symbol, message);
 				for (PublicAggreDealsV3ApiItem trade : data.getPublicAggreDeals().getDealsList()) {
 					tradeCallback.accept(new MexcTrade(trade));
 				}
 			} else if (data.getChannel().equalsIgnoreCase(SPOT_ACCOUNT_UPDATES_CHANNEL)) {
-				listener.onAccountBalanceUpdate(bytesStream.toByteArray());
+				listener.onAccountBalanceUpdate(message);
 				accountBalanceCallback.accept(new MexcAccountBalanceUpdate(data.getPrivateAccount()));
 			} else if (data.getChannel().equalsIgnoreCase(SPOT_ORDER_UPDATES_CHANNEL)) {
-				listener.onOrderUpdate(bytesStream.toByteArray());
+				listener.onOrderUpdate(message);
 				orderChangeCallback.accept(new MexcOrderChange(symbol, data.getPrivateOrders()));
 			}
 		} catch (InvalidProtocolBufferException e) {
-			Log.error("The Websocket client could not parse Protobuf.", e);
-		} catch (IOException e) {
 			Log.error("The Websocket client could not parse Protobuf.", e);
 		}
 	}

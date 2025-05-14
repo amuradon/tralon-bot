@@ -5,19 +5,23 @@ import java.util.concurrent.ExecutorService;
 
 public class DataStoringWebsocketClientListener extends DataStoringBase implements WebsocketClientListener {
 
-	public DataStoringWebsocketClientListener(final ExecutorService executorService, final Path dataDir) {
+	private final String fileExtension;
+	
+	public DataStoringWebsocketClientListener(final ExecutorService executorService, final Path dataDir,
+			final String fileExtension) {
 		super(executorService, dataDir);
+		this.fileExtension = fileExtension;
 	}
 	
 	@Override
 	public void onOrderBookUpdate(String symbol, byte[] message) {
-		writeToFile(message, "orderBookUpdates.json");
+		writeToFile(message, "orderBookUpdates." + fileExtension);
 
 	}
 
 	@Override
 	public void onTrade(String symbol, byte[] message) {
-		writeToFile(message, "trades.json");
+		writeToFile(message, "trades." + fileExtension);
 	}
 
 	@Override
