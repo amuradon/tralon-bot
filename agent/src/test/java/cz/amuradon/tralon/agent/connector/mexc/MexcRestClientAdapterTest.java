@@ -2,9 +2,6 @@ package cz.amuradon.tralon.agent.connector.mexc;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -15,6 +12,7 @@ import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.Map;
+import java.util.function.BiFunction;
 import java.util.stream.Stream;
 
 import javax.crypto.Mac;
@@ -38,12 +36,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import cz.amuradon.tralon.agent.OrderType;
 import cz.amuradon.tralon.agent.Side;
-import cz.amuradon.tralon.agent.connector.InvalidPrice;
-import cz.amuradon.tralon.agent.connector.NewOrderError;
-import cz.amuradon.tralon.agent.connector.NewOrderResponse;
-import cz.amuradon.tralon.agent.connector.TradeDirectionNotAllowed;
+import cz.amuradon.tralon.agent.connector.NoValidTradePriceException;
+import cz.amuradon.tralon.agent.connector.RequestException;
+import cz.amuradon.tralon.agent.connector.TradeDirectionNotAllowedException;
 import cz.amuradon.tralon.agent.strategies.newlisting.ErrorResponse;
-import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.Response.StatusType;
 
@@ -87,67 +83,45 @@ public class MexcRestClientAdapterTest {
 	
 	@ParameterizedTest
 	@MethodSource("newOrderInvalidPriceData")
-	public void newOrderInvalidPrice(String errorMessage, BigDecimal expectedMaxPrice) throws Exception {
-		NewOrderError error = testErrorResponse(errorMessage, 400, "30010", InvalidPrice.class);
+	public void newOrderNoValidPriceResponse(String errorMessage, BigDecimal expectedMaxPrice) throws Exception {
+		RequestException error = testErrorResponse(errorMessage, 400, "30010", NoValidTradePriceException.class,
+				(r, er) -> new NoValidTradePriceException(r, expectedMaxPrice, er));
 		
-		InvalidPrice ipError = (InvalidPrice) error;
+		NoValidTradePriceException ipError = (NoValidTradePriceException) error;
 		Assertions.assertEquals(expectedMaxPrice, ipError.validPrice());
 	}
 	
-	
-	static Stream<Arguments> newOrderOtherErrorResponsesData() {
-		return Stream.of(
-				Arguments.of("Not important here", 429, "Not important here", NewOrderError.class),
-				Arguments.of("Not important here", 400, "30001", TradeDirectionNotAllowed.class)
-				);
+	@Test
+	public void newOrderNoTradingYetResponse() throws Exception {
+		testErrorResponse("Not important here", 400, "30001", TradeDirectionNotAllowedException.class,
+				TradeDirectionNotAllowedException::new);
+	}
+
+	@Test
+	public void newOrderTooManyRequestsResponses() throws Exception {
+		testErrorResponse("Not important here", 429, "Not important here", RequestException.class,
+				RequestException::new);
 	}
 	
-	@ParameterizedTest
-	@MethodSource("newOrderOtherErrorResponsesData")
-	public void newOrderOtherErrorResponses(String errorMessage, int status, String errorCode,
-			Class<?> errorClass) throws Exception {
-		testErrorResponse(errorMessage, status, errorCode, errorClass);
-	}
-	
-	private NewOrderError testErrorResponse(String errorMessage, int status, String errorCode,
-			Class<?> errorClass) throws Exception {
-		WebApplicationException webApplicationExceptionMock = mock(WebApplicationException.class);
+	private <T extends Throwable> T testErrorResponse(String errorMessage, int status, String errorCode,
+			Class<T> errorClass, BiFunction<Response, ErrorResponse, T> exceptionFactory) throws Exception {
 		Response responseMock = mock(Response.class);
 		StatusType statusTypeMock = mock(StatusType.class);
 		
-		when(webApplicationExceptionMock.getResponse()).thenReturn(responseMock);
 		when(responseMock.getStatus()).thenReturn(status);
 		ErrorResponse errorResponse = new ErrorResponse(errorCode, errorMessage);
 		when(responseMock.readEntity(ErrorResponse.class))
 		.thenReturn(errorResponse);
 		when(responseMock.getStatusInfo()).thenReturn(statusTypeMock);
 		when(statusTypeMock.getReasonPhrase()).thenReturn("Not important");
-		doThrow(webApplicationExceptionMock).when(mexcClientMock).newOrder(anyMap());
+		doThrow(exceptionFactory.apply(responseMock, errorResponse)).when(mexcClientMock).newOrder(anyMap());
 		
 		quantityScales.put(SYMBOL, 4);
 		priceScales.put(SYMBOL, 4);
-		NewOrderResponse response = client.newOrder().symbol(SYMBOL).price(BigDecimal.ONE).size(BigDecimal.ONE).send();
 		
-		Assertions.assertFalse(response.success());
-		Assertions.assertNull(response.orderId());
-		
-		NewOrderError error = response.error();
-		Assertions.assertInstanceOf(errorClass, error);
-		return error;
+		return Assertions.assertThrows(errorClass, () -> client.newOrder().symbol(SYMBOL).price(BigDecimal.ONE).size(BigDecimal.ONE).send());
 	}
 	
-	@Test
-	public void newOrderMissingSizeShouldThrowException() {
-		assertThrows(IllegalArgumentException.class, () ->
-			client.newOrder().symbol(SYMBOL).price(BigDecimal.ONE).send());
-	}
-
-	@Test
-	public void newOrderMissingPriceShouldThrowException() {
-		assertThrows(IllegalArgumentException.class, () ->
-			client.newOrder().symbol(SYMBOL).size(BigDecimal.ONE).send());
-	}
-
 	@Test
 	public void newOrderShouldContainAllParams() {
 		long timestamp = 1746446247L;
@@ -157,14 +131,12 @@ public class MexcRestClientAdapterTest {
 		
 		quantityScales.put(SYMBOL, 4);
 		priceScales.put(SYMBOL, 4);
-		NewOrderResponse response = client.newOrder().symbol(SYMBOL).clientOrderId(clientOrderId)
+		String orderId = client.newOrder().symbol(SYMBOL).clientOrderId(clientOrderId)
 				.size(new BigDecimal("1.22222")).side(Side.BUY)
 				.price(new BigDecimal("2.11111")).timestamp(timestamp).recvWindow(10000).type(OrderType.LIMIT)
 				.signParams().send();
 		
-		assertTrue(response.success());
-		assertEquals(ORDER_ID, response.orderId());
-		assertNull(response.error());
+		assertEquals(ORDER_ID, orderId);
 		
 		verify(mexcClientMock).newOrder(parametersCaptor.capture());
 		Map<String, Object> parameters = parametersCaptor.getValue();
@@ -176,19 +148,19 @@ public class MexcRestClientAdapterTest {
 		assertEquals(String.valueOf(timestamp), parameters.get("timestamp"));
 		assertEquals(String.valueOf(10000), parameters.get("recvWindow"));
 		assertEquals("LIMIT", parameters.get("type"));
-		assertEquals("08683ef1fd551992d00d52d0ab7f81ebbc04235341498bf5a32d5c1b35da4f0c", parameters.get("signature"));
+		assertEquals("7a0ade1dcee66333064b95efdaa55baf83741d35c4cd23b434f7d6ede964323b", parameters.get("signature"));
 	}
 	
 	@Test
 	public void newOrderNoTimestampShouldFillIt() {
 		when(mexcClientMock.newOrder(anyMap())).thenReturn(new OrderResponse(ORDER_ID));
 		
-		NewOrderResponse response = client.newOrder().symbol(SYMBOL)
+		String orderId = client.newOrder().symbol(SYMBOL)
 				.size(BigDecimal.ONE).side(Side.BUY)
 				.price(BigDecimal.ONE).type(OrderType.LIMIT)
 				.signParams().send();
 		
-		assertTrue(response.success());
+		assertEquals(ORDER_ID, orderId);
 		
 		verify(mexcClientMock).newOrder(parametersCaptor.capture());
 		Map<String, Object> parameters = parametersCaptor.getValue();
@@ -199,12 +171,12 @@ public class MexcRestClientAdapterTest {
 	public void newOrderNotSignedShouldSign() {
 		when(mexcClientMock.newOrder(anyMap())).thenReturn(new OrderResponse(ORDER_ID));
 		
-		NewOrderResponse response = client.newOrder().symbol(SYMBOL)
+		String orderId = client.newOrder().symbol(SYMBOL)
 				.size(BigDecimal.ONE).side(Side.BUY)
 				.price(BigDecimal.ONE).type(OrderType.LIMIT)
 				.send();
 		
-		assertTrue(response.success());
+		assertEquals(ORDER_ID, orderId);
 		
 		verify(mexcClientMock).newOrder(parametersCaptor.capture());
 		Map<String, Object> parameters = parametersCaptor.getValue();
@@ -225,14 +197,14 @@ public class MexcRestClientAdapterTest {
 		
 		quantityScales.put(SYMBOL, 4);
 		priceScales.put(SYMBOL, 4);
-		NewOrderResponse response = client.newOrder().symbol(SYMBOL)
+		String orderId = client.newOrder().symbol(SYMBOL)
 				.size(new BigDecimal("1.00441")).side(Side.BUY)
 				.price(new BigDecimal("2.11551")).type(OrderType.LIMIT)
 				.timestamp(1746446247L)
 				.signParams()
 				.send();
 		
-		assertTrue(response.success());
+		assertEquals(ORDER_ID, orderId);
 		
 		verify(mexcClientMock).newOrder(parametersCaptor.capture());
 		Map<String, Object> parameters = parametersCaptor.getValue();

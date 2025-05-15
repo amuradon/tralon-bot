@@ -14,19 +14,17 @@ import java.util.concurrent.TimeUnit;
 import cz.amuradon.tralon.agent.OrderStatus;
 import cz.amuradon.tralon.agent.OrderType;
 import cz.amuradon.tralon.agent.Side;
-import cz.amuradon.tralon.agent.connector.InvalidPrice;
-import cz.amuradon.tralon.agent.connector.NewOrderError;
-import cz.amuradon.tralon.agent.connector.NewOrderResponse;
+import cz.amuradon.tralon.agent.connector.NoValidTradePriceException;
 import cz.amuradon.tralon.agent.connector.OrderBookResponse;
 import cz.amuradon.tralon.agent.connector.OrderChange;
+import cz.amuradon.tralon.agent.connector.RequestException;
 import cz.amuradon.tralon.agent.connector.RestClient;
 import cz.amuradon.tralon.agent.connector.SymbolInfo;
 import cz.amuradon.tralon.agent.connector.Trade;
-import cz.amuradon.tralon.agent.connector.TradeDirectionNotAllowed;
+import cz.amuradon.tralon.agent.connector.TradeDirectionNotAllowedException;
 import cz.amuradon.tralon.agent.connector.WebsocketClient;
 import cz.amuradon.tralon.agent.strategies.Strategy;
 import io.quarkus.logging.Log;
-import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
 
 public class NewListingStrategy implements Strategy {
@@ -230,34 +228,34 @@ public class NewListingStrategy implements Strategy {
 				i++;
 				previousSendTime = currentTime; 
 				Log.infof("Place new buy limit order attempt %d", i);
-					NewOrderResponse newOrderResponse = newOrderBuilder.send();
-					if (newOrderResponse.success()) {
-						buyOrderId = newOrderResponse.orderId();
-						Log.infof("New order placed: %s", buyOrderId);
-						break;
+				
+				try {
+					buyOrderId = newOrderBuilder.send();
+					Log.infof("New order placed: %s", buyOrderId);
+					break;
+				} catch (NoValidTradePriceException e) {
+					BigDecimal maxPrice = e.validPrice();
+					Log.infof("Resetting max price: '%s'", maxPrice);
+					timestamp = currentTime;
+					newOrderBuilder.timestamp(timestamp).price(maxPrice).signParams();
+					// Repeat
+				} catch (TradeDirectionNotAllowedException e) {
+					// Do nothing, repeat
+				} catch (RequestException e) {
+					Response response = e.getResponse();
+					ErrorResponse errorResponse = e.errorResponse();
+					int status = response.getStatus();
+					Log.errorf("ERR response: %d - %s: %s, Headers: %s", status,
+							response.getStatusInfo().getReasonPhrase(), errorResponse, response.getHeaders());
+					if (status == 429) {
+						Log.warnf("Retry after: ", response.getHeaderString("Retry-After"));
+						// Do nothing, repeat
 					} else {
-						NewOrderError error = newOrderResponse.error();
-						WebApplicationException e = error.exception();
-						Response response = e.getResponse();
-						ErrorResponse errorResponse = error.errorResponse();
-						int status = response.getStatus();
-						Log.errorf("ERR response: %d - %s: %s, Headers: %s", status,
-								response.getStatusInfo().getReasonPhrase(), errorResponse, response.getHeaders());
-						
-						if (error instanceof InvalidPrice ip) {
-							BigDecimal maxPrice = ip.validPrice();
-							Log.infof("Resetting max price: '%s'", maxPrice);
-							timestamp = currentTime;
-							newOrderBuilder.timestamp(timestamp).price(maxPrice).signParams();
-						} else if (status == 429) {
-							Log.warnf("Retry after: ", response.getHeaderString("Retry-After"));
-							// Do nothing, repeat
-						} else if (!(error instanceof TradeDirectionNotAllowed)) {
-							Log.infof("It is not \"Not yet trading\" error code '%s - %s', not retrying...",
-									errorResponse.code(), errorResponse.msg());
-							break;
-						}
+						Log.infof("It is not \"Not yet trading\" error code '%s - %s', not retrying...",
+								errorResponse.code(), errorResponse.msg());
+						break;
 					}
+				}
 			}
 		}
 	}

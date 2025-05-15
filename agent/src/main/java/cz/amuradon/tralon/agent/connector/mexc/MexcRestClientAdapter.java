@@ -14,8 +14,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.StringJoiner;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import javax.crypto.Mac;
@@ -29,34 +27,21 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.amuradon.tralon.agent.OrderType;
 import cz.amuradon.tralon.agent.Side;
 import cz.amuradon.tralon.agent.connector.AccountBalance;
-import cz.amuradon.tralon.agent.connector.InvalidPrice;
-import cz.amuradon.tralon.agent.connector.NewOrderError;
-import cz.amuradon.tralon.agent.connector.NewOrderResponse;
 import cz.amuradon.tralon.agent.connector.NoopRestClientListener;
 import cz.amuradon.tralon.agent.connector.OrderBookResponse;
 import cz.amuradon.tralon.agent.connector.OrderBookResponseImpl;
 import cz.amuradon.tralon.agent.connector.RestClient;
 import cz.amuradon.tralon.agent.connector.RestClientFactory;
 import cz.amuradon.tralon.agent.connector.RestClientListener;
-import cz.amuradon.tralon.agent.connector.TradeDirectionNotAllowed;
 import cz.amuradon.tralon.agent.model.Order;
-import cz.amuradon.tralon.agent.strategies.newlisting.ErrorResponse;
-import io.quarkus.logging.Log;
 import jakarta.enterprise.context.Dependent;
 import jakarta.inject.Inject;
-import jakarta.ws.rs.WebApplicationException;
-import jakarta.ws.rs.core.Response;
 
 @Dependent
 @Mexc
 @RestClientFactory // Required for proper usage with Instance
 public class MexcRestClientAdapter implements RestClient {
 
-	// Used when trading in new listing not started yet
-	private static final String TRANS_DIRECTION_NOT_ALLOWED = "30001";
-		
-	private static final String NO_VALID_TRADE_PRICE = "30010";
-	
 	private static final String HMAC_SHA256 = "HmacSHA256";
 	
 	private final MexcClient mexcClient;
@@ -254,35 +239,13 @@ public class MexcRestClientAdapter implements RestClient {
     	}
     	
 		@Override
-    	public NewOrderResponse send() {
+    	public String send() {
     		if (params.get(TIMESTAMP) == null) {
     			params.put(TIMESTAMP, String.valueOf(new Date().getTime()));
     			signed = false;
     		}
     		
-    		try {
-    			return new NewOrderResponse(true,
-    					mexcClient.newOrder(signed ? params : signQueryParams(params)).orderId(), null);
-			} catch (WebApplicationException e) {
-				Response response = e.getResponse();
-				ErrorResponse errorResponse = response.readEntity(ErrorResponse.class);
-				int status = response.getStatus();
-				Log.errorf("ERR response: %d - %s: %s, Headers: %s", status,
-						response.getStatusInfo().getReasonPhrase(), errorResponse, response.getHeaders());
-				if (NO_VALID_TRADE_PRICE.equalsIgnoreCase(errorResponse.code())) {
-					Matcher matcher = Pattern.compile(".*\\s(\\d+(\\.\\d+)?)USDT").matcher(errorResponse.msg());
-					if (matcher.find()) {
-						String maxPrice = matcher.group(1);
-						return new NewOrderResponse(false, null,
-								new InvalidPrice(e, new BigDecimal(maxPrice), errorResponse));
-					}
-				} else if (TRANS_DIRECTION_NOT_ALLOWED.equalsIgnoreCase(errorResponse.code())) {
-					Log.infof("It is not \"Not yet trading\" error code '%s - %s', not retrying...",
-							errorResponse.code(), errorResponse.msg());
-					return new NewOrderResponse(false, null, new TradeDirectionNotAllowed(e, errorResponse));
-				}
-				return new NewOrderResponse(false, null, new NewOrderError(e, errorResponse));
-			}
+			return mexcClient.newOrder(signed ? params : signQueryParams(params)).orderId();
     		
     	}
 

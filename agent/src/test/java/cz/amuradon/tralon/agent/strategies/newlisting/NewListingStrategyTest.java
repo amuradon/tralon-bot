@@ -3,6 +3,8 @@ package cz.amuradon.tralon.agent.strategies.newlisting;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -16,6 +18,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,12 +32,17 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
-import cz.amuradon.tralon.agent.connector.InvalidPrice;
-import cz.amuradon.tralon.agent.connector.NewOrderError;
-import cz.amuradon.tralon.agent.connector.NewOrderResponse;
+import cz.amuradon.tralon.agent.OrderStatus;
+import cz.amuradon.tralon.agent.connector.NoValidTradePriceException;
+import cz.amuradon.tralon.agent.connector.OrderChange;
+import cz.amuradon.tralon.agent.connector.RequestException;
 import cz.amuradon.tralon.agent.connector.RestClient;
-import cz.amuradon.tralon.agent.connector.TradeDirectionNotAllowed;
+import cz.amuradon.tralon.agent.connector.SymbolInfo;
+import cz.amuradon.tralon.agent.connector.Trade;
+import cz.amuradon.tralon.agent.connector.TradeDirectionNotAllowedException;
 import cz.amuradon.tralon.agent.connector.WebsocketClient;
+import cz.amuradon.tralon.agent.connector.binance.BinanaceTrade;
+import cz.amuradon.tralon.agent.connector.binance.BinanceOrderChange;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.Response.StatusType;
@@ -42,6 +50,8 @@ import jakarta.ws.rs.core.Response.StatusType;
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 public class NewListingStrategyTest {
+
+	private static final String SYMBOL = "TKNUSDT";
 
 	@Mock
 	private RestClient restClientMock;
@@ -70,33 +80,81 @@ public class NewListingStrategyTest {
 	@Captor
 	private ArgumentCaptor<BigDecimal> priceCaptor;
 	
+	@Captor
+	private ArgumentCaptor<Consumer<Trade>> tradeCallbackCaptor;
+	
+	@Captor
+	private ArgumentCaptor<Consumer<OrderChange>> orderChangeCallbackCaptor;
+
+	@Captor
+	private ArgumentCaptor<Runnable> schedulerTaskCaptor;
+	
 	private NewListingStrategy strategy;
 	
 	@BeforeEach
 	public void prepare() {
 		when(newOrderSymbolBuilderMock.symbol(anyString())).thenReturn(newOrderBuilderMock);
+		when(restClientMock.cacheSymbolDetails(eq(SYMBOL))).thenReturn(new SymbolInfo(4));
 		when(restClientMock.newOrder()).thenReturn(newOrderSymbolBuilderMock);
-		when(scheduledExecutorServiceMock.schedule(any(Runnable.class), anyLong(), any(TimeUnit.class)))
-			.thenAnswer(i -> {
-				i.getArgument(0, Runnable.class).run();
-				return scheduledFutureMock;
-			});
 		when(computeInitialPriceMock.execute(anyString(), any())).thenReturn(new BigDecimal("0.1"));
 		
 		strategy = new NewListingStrategy(scheduledExecutorServiceMock, restClientMock, websocketClientMock,
-				computeInitialPriceMock, new BigDecimal(100), "TKNUSDT", LocalDateTime.now().plusMinutes(5), 5, 5, 15, 500, 500);
+				computeInitialPriceMock, new BigDecimal(100), SYMBOL, LocalDateTime.now().plusMinutes(5), 5, 5, 15, 1, 500);
 	}
 
+	/*
+	 * Testy:
+	 * 1) buy order fully filled, cena stoupa, spadne pod stop price, proda
+	 * 2) buy order castecne filled, cena stoupa pres max price, vytika, zrusi zbytek orderu, spadne pod stop price, proda koupenou cast
+	 * 3) cena uleti prilis rychle, buy order neni filled, po vytikani se zrusi 
+	 * - nereaguje na trade updaty, dokud neni otevrena pozice
+	 */
 	@Test
 	public void testSuccessfulSend() throws Exception {
-		when(newOrderBuilderMock.send()).thenReturn(new NewOrderResponse(true, "orderId", null));
+		mockSchedulerTask(false);
+		when(newOrderBuilderMock.send()).thenReturn("orderId");
 		strategy.start();
+		
+		verify(scheduledExecutorServiceMock, times(2)).schedule(schedulerTaskCaptor.capture(), anyLong(), any());
+		
+		List<Runnable> tasks = schedulerTaskCaptor.getAllValues();
+		Assertions.assertEquals(2, tasks.size());
+		
+		// They should be NewListingStrategy.prepare() and NewListingStrategy.placeNewOrder()
+		Runnable prepare = tasks.get(0);
+		Runnable placeNewOrder = tasks.get(1);
+		
+		prepare.run();
+		
+		verify(websocketClientMock).onTrade(tradeCallbackCaptor.capture(), anyString());
+		verify(websocketClientMock).onOrderChange(orderChangeCallbackCaptor.capture());
+		
+		Consumer<Trade> onTrade = tradeCallbackCaptor.getValue();
+		Consumer<OrderChange> onOrderChange = orderChangeCallbackCaptor.getValue();
+		
+		long timestamp = System.currentTimeMillis();
+		// Using BinanceTrade as simplest to create (record) - side and quantity don't matter as of now
+		onTrade.accept(new BinanaceTrade(new BigDecimal("0.0010"), null, null, timestamp));
+		onTrade.accept(new BinanaceTrade(new BigDecimal("0.0015"), null, null, timestamp + 1));
+		placeNewOrder.run();
+		
 		verify(newOrderBuilderMock).send();
+		
+		// Position not opened yet, no reaction...
+		onTrade.accept(new BinanaceTrade(new BigDecimal("0.0012"), null, null, timestamp + 2));
+		onTrade.accept(new BinanaceTrade(new BigDecimal("0.0011"), null, null, timestamp + 3));
+
+		// ... no sell order sent
+		verify(newOrderBuilderMock).send();
+		
+		// Using BinanceTrade as simplest to create (record) - null values don't matter as of now
+		onOrderChange.accept(new BinanceOrderChange(OrderStatus.FILLED, null, null, "", null, null, null, new BigDecimal("")));
 	}
 
 	@Test
 	public void invalidPrice() throws Exception {
-		mockNewOrderException(400, (e, r) -> new InvalidPrice(e, new BigDecimal("0.05"), r));
+		mockSchedulerTask(true);
+		mockNewOrderException(400, (r, er) -> new NoValidTradePriceException(r, new BigDecimal("0.05"), er));
 		
 		strategy.start();
 		
@@ -111,7 +169,8 @@ public class NewListingStrategyTest {
 
 	@Test
 	public void tooManyRequests() throws Exception {
-		mockNewOrderException(429, (e, r) -> new NewOrderError(e, r));
+		mockSchedulerTask(true);
+		mockNewOrderException(429, (r, er) -> new RequestException(r, er));
 		
 		strategy.start();
 		
@@ -121,15 +180,27 @@ public class NewListingStrategyTest {
 	
 	@Test
 	public void tradeDirectionNotAllowed() throws Exception {
-		mockNewOrderException(400, (e, r) -> new TradeDirectionNotAllowed(e, r));
+		mockSchedulerTask(true);
+		mockNewOrderException(400, (r, er) -> new TradeDirectionNotAllowedException(r, er));
 		
 		strategy.start();
 		
 		verify(newOrderBuilderMock).price(priceCaptor.capture());
 		verify(newOrderBuilderMock, times(2)).send();
 	}
+	
+	private void mockSchedulerTask(boolean runImmediately) {
+		when(scheduledExecutorServiceMock.schedule(any(Runnable.class), anyLong(), any(TimeUnit.class)))
+			.thenAnswer(i -> {
+				if (runImmediately) {
+					i.getArgument(0, Runnable.class).run();
+				}
+				return scheduledFutureMock;
+			});
+	}
 
-	private void mockNewOrderException(int status, BiFunction<WebApplicationException, ErrorResponse, NewOrderError> errorFactory) {
+
+	private void mockNewOrderException(int status, BiFunction<Response, ErrorResponse, RequestException> errorFactory) {
 		WebApplicationException webApplicationExceptionMock = mock(WebApplicationException.class);
 		Response responseMock = mock(Response.class);
 		StatusType statusTypeMock = mock(StatusType.class);
@@ -139,9 +210,10 @@ public class NewListingStrategyTest {
 		ErrorResponse errorResponse = new ErrorResponse("1111", "some error message");
 		when(responseMock.getStatusInfo()).thenReturn(statusTypeMock);
 		when(statusTypeMock.getReasonPhrase()).thenReturn("Bad Request");
-		when(newOrderBuilderMock.send()).thenReturn(new NewOrderResponse(false, null,
-				errorFactory.apply(webApplicationExceptionMock, errorResponse)),
-				new NewOrderResponse(true, "orderId", null));
+		
+		// The exception has to be initiated first and then passed to stub, otherwise the stubbing fails
+		RequestException exception = errorFactory.apply(responseMock, errorResponse);
+		when(newOrderBuilderMock.send()).thenThrow(exception).thenReturn("orderId");
 	}
 	
 }

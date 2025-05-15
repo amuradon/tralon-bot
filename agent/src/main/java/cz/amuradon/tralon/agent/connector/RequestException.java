@@ -2,20 +2,17 @@ package cz.amuradon.tralon.agent.connector;
 
 import cz.amuradon.tralon.agent.strategies.newlisting.ErrorResponse;
 import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.core.Response;
 
-public class NewOrderError {
+public class RequestException extends WebApplicationException {
 
-	private final WebApplicationException exception;
+	private static final long serialVersionUID = -6997078136481105337L;
 	
 	private final ErrorResponse errorResponse;
 	
-	public NewOrderError(final WebApplicationException exception, ErrorResponse errorResponse) {
-		this.exception = exception;
+	public RequestException(Response response, ErrorResponse errorResponse) {
+		super(response);
 		this.errorResponse = errorResponse;
-	}
-
-	public WebApplicationException exception() {
-		return exception;
 	}
 
 	public ErrorResponse errorResponse() {
