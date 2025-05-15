@@ -7,8 +7,6 @@ import java.math.BigDecimal;
 
 import org.junit.jupiter.api.Test;
 
-import cz.amuradon.tralon.agent.Side;
-
 public class SideTest {
 
 	@Test
@@ -40,4 +38,5 @@ public class SideTest {
 	public void isPriceOutOfRangeSellUpdateLesser() {
 		assertFalse(Side.SELL.isPriceOutOfRange(new BigDecimal("1.5"), new BigDecimal("1.6")));
 	}
+	
 }

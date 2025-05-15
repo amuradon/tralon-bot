@@ -160,17 +160,24 @@ public class MexcExchangeMock implements QuarkusTestResourceLifecycleManager {
 			    "symbol": "BTCUSDT"
 			}
 			""");
+		*/
 		
-		// Simplified
-		// Response not used in PROD code yet
-		expectPost("/fapi/v1/order", () ->
+		// Simplified (only in code used fields)
+		expectPost("/order", () ->
 			"""
 			{
-			    "clientOrderId": "testOrder",
-			    "orderId": 22542179
+			    "orderId": 22542171
+			}
+			""");
+		
+		expectPost("/order?newClientOrderId=TEST", () ->
+			"""
+			{
+			    "orderId": 11542179
 			}
 			""");
 
+		/*
 		server.expect().withPath("/ws/" + listenKey).andUpgradeToWebSocket()
 			.open()
 			.immediately().andEmit(listenKey)

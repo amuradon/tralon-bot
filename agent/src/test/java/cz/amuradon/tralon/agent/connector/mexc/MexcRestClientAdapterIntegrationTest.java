@@ -4,11 +4,13 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Formatter.BigDecimalLayoutForm;
 import java.util.concurrent.ExecutorService;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import cz.amuradon.tralon.agent.Side;
 import cz.amuradon.tralon.agent.connector.DataStoringRestClientListener;
 import cz.amuradon.tralon.agent.connector.OrderBookResponse;
 import cz.amuradon.tralon.agent.connector.RestClientFactory;
@@ -41,7 +43,13 @@ public class MexcRestClientAdapterIntegrationTest {
 		
 		Assertions.assertEquals(new BigDecimal("8.88"), orderResponse.asks().get(new BigDecimal("0.3200")));
 		Assertions.assertEquals(new BigDecimal("4.44"), orderResponse.bids().get(new BigDecimal("0.2800")));
-		
+	}
+
+	@Test
+	public void testNewOrder() throws IOException {
+		String orderId = client.newOrder().symbol("TKNUSDT").side(Side.BUY)
+				.price(new BigDecimal("0.1")).size(BigDecimal.ONE).clientOrderId("TEST").send();
+		System.out.println(orderId);
 	}
 	
 }
