@@ -9,4 +9,5 @@ public interface WebsocketClient {
 	void onOrderBookChange(Consumer<OrderBookChange> callback, String symbol);
 	void onTrade(Consumer<Trade> callback, String symbol);
 	void setListener(WebsocketClientListener listener);
+	void close();
 }

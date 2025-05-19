@@ -1,5 +1,6 @@
 package cz.amuradon.tralon.agent.connector.kucoin;
 
+import java.io.IOException;
 import java.util.function.Consumer;
 
 import com.kucoin.sdk.KucoinPrivateWSClient;
@@ -55,6 +56,16 @@ public class KucoinWebsocketClient implements WebsocketClient {
 	@Override
 	public void setListener(WebsocketClientListener listener) {
 		// TODO Implementovat az bude bez SDK v low-level
+	}
+
+	@Override
+	public void close() {
+		try {
+			wsClientPrivate.close();
+			wsClientPublic.close();
+		} catch (IOException e) {
+			throw new IllegalStateException("The Websocket client could not be established.", e);
+		}
 	}
 
 }

@@ -3,6 +3,8 @@ package cz.amuradon.tralon.agent.connector.mexc;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URI;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.function.Consumer;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -67,6 +69,8 @@ public class MexcWebsocketClient implements WebsocketClient {
 	
 	private Session session;
 	
+	private final Set<String> subscribedChannels;
+	
 	@Inject
 	public MexcWebsocketClient(@ConfigProperty(name = "mexc-api.websocket.url") final String baseUri,
 			@Mexc RestClient restClient) {
@@ -74,6 +78,7 @@ public class MexcWebsocketClient implements WebsocketClient {
 		this.restClient = restClient;
 		this.listener = new NoopWebsocketClientListener();
 		mapper = new ObjectMapper();
+		subscribedChannels = new HashSet<>();
 		accountBalanceCallback = e -> {};
 		orderChangeCallback = e -> {};
 		orderBookChangeCallback = e -> {};
@@ -108,6 +113,7 @@ public class MexcWebsocketClient implements WebsocketClient {
 	
 	private void subscribe(String channel) {
 		Log.infof("Subscribing: %s", channel);
+		subscribedChannels.add(channel);
 		try {
 			// TODO validovat, jestli kanalu byla uspesna 
 			session.getBasicRemote().sendText(String.format(
@@ -194,6 +200,16 @@ public class MexcWebsocketClient implements WebsocketClient {
 		tradeUpdatesChannel = SPOT_TRADE_UPDATES_CHANNEL_PREFIX + symbol; 
 		subscribe(tradeUpdatesChannel);
 		tradeCallback = callback;
+	}
+
+	@Override
+	public void close() {
+		try {
+			session.close();
+		} catch (IOException e) {
+			throw new IllegalStateException("The Websocket client could not be established.", e);
+		}
+		
 	}
 
 }

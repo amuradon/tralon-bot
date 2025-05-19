@@ -25,6 +25,8 @@ import cz.amuradon.tralon.agent.strategies.newlisting.NewListingStrategy;
 import io.quarkus.logging.Log;
 import io.quarkus.qute.CheckedTemplate;
 import io.quarkus.qute.TemplateInstance;
+import io.quarkus.runtime.Shutdown;
+import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.GET;
@@ -34,6 +36,7 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 
 @Path("/")
+@ApplicationScoped
 public class MainPageResource {
 
 	private static final String MARKET_MAKING = "Market Making";
@@ -57,6 +60,11 @@ public class MainPageResource {
 		runningStrategies = new ConcurrentSkipListMap<>();
 		supportedExchanges = Arrays.stream(Exchange.values()).map(Exchange::displayName).collect(Collectors.toList());
 		this.scheduler = scheduler;
+	}
+	
+	@Shutdown
+	public void onShutdown() {
+		runningStrategies.values().forEach(Strategy::stop);
 	}
 	
 	@GET

@@ -135,4 +135,9 @@ public class BinanceWebsocketClient implements WebsocketClient {
 		this.listener = listener;
 	}
 
+	@Override
+	public void close() {
+		client.closeAllConnections();
+	}
+
 }

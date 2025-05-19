@@ -153,6 +153,7 @@ public class NewListingStrategy implements Strategy {
 	@Override
 	public void stop() {
 		// TODO Cancel all
+		websocketClient.close();
 	}
 
 	@Override
@@ -206,7 +207,7 @@ public class NewListingStrategy implements Strategy {
 			.clientOrderId(clientOrderId)
 			.side(Side.BUY)
 			.type(OrderType.LIMIT)
-			// FIXME quantity je spocitana na tu max price!!! 
+			// FIXME quantity je spocitana na tu max price!!!
 			.size(maxQuoteBalanceToUse.divide(price, 10, RoundingMode.HALF_UP))
 			.price(price)
 			.recvWindow(recvWindow)
@@ -234,6 +235,7 @@ public class NewListingStrategy implements Strategy {
 					Log.infof("New order placed: %s", buyOrderId);
 					break;
 				} catch (NoValidTradePriceException e) {
+					// XXX pri zmene max ceny by to melo prepocitat i mnozstvi 
 					BigDecimal maxPrice = e.validPrice();
 					Log.infof("Resetting max price: '%s'", maxPrice);
 					timestamp = currentTime;
