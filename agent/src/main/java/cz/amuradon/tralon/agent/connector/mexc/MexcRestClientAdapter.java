@@ -140,7 +140,10 @@ public class MexcRestClientAdapter implements RestClient {
 	}
 
 	private Map<String, Object> signQueryParams(Map<String, Object> params) {
-    	StringJoiner joiner = new StringJoiner("&");
+		// It has to be removed for repeated signing of retries to work properly
+		params.remove("signature");
+    	
+		StringJoiner joiner = new StringJoiner("&");
     	for (Entry<String, Object> entry : params.entrySet()) {
 			joiner.add(entry.getKey() + "=" + entry.getValue());
 		}

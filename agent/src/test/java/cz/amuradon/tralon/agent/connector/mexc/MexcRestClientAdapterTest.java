@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -38,6 +39,7 @@ import cz.amuradon.tralon.agent.OrderType;
 import cz.amuradon.tralon.agent.Side;
 import cz.amuradon.tralon.agent.connector.NoValidTradePriceException;
 import cz.amuradon.tralon.agent.connector.RequestException;
+import cz.amuradon.tralon.agent.connector.RestClient.NewOrderBuilder;
 import cz.amuradon.tralon.agent.connector.TradeDirectionNotAllowedException;
 import cz.amuradon.tralon.agent.strategies.newlisting.ErrorResponse;
 import jakarta.ws.rs.core.Response;
@@ -186,29 +188,55 @@ public class MexcRestClientAdapterTest {
 	// TODO vice ruznych testu na signature?
 	@Test
 	public void newOrderSignature() throws Exception {
+		newOrderFirstSignature();
+	}
+
+	@Test
+	public void newOrderRepeatedSignature() throws Exception {
+		SignatureTestDataHolder holder = newOrderFirstSignature();
+		
+		holder.builder.price(new BigDecimal("2.22222")).timestamp(1746446347L).signParams().send();
+		
+		String toBeSigned = "symbol=TKNUSDT&quantity=1.0044&side=BUY&price=2.2222&type=LIMIT&timestamp=1746446347";
+		Object signature = HexFormat.of().formatHex(holder.mac.doFinal(toBeSigned.getBytes()));
+		
+		verify(mexcClientMock, times(2)).newOrder(parametersCaptor.capture());
+		Map<String, Object> parameters = parametersCaptor.getValue();
+		assertEquals(signature, parameters.get("signature"));
+	}
+	
+	private SignatureTestDataHolder newOrderFirstSignature() throws Exception {
 		final String hmac = "HmacSHA256";
 		Mac mac = Mac.getInstance(hmac);
 		mac.init(new SecretKeySpec(SECRET_KEY.getBytes(), hmac));
 		
 		String toBeSigned = "symbol=TKNUSDT&quantity=1.0044&side=BUY&price=2.1155&type=LIMIT&timestamp=1746446247";
-    	String signature = HexFormat.of().formatHex(mac.doFinal(toBeSigned.getBytes()));
+		String signature = HexFormat.of().formatHex(mac.doFinal(toBeSigned.getBytes()));
 		
 		when(mexcClientMock.newOrder(anyMap())).thenReturn(new OrderResponse(ORDER_ID));
 		
 		quantityScales.put(SYMBOL, 4);
 		priceScales.put(SYMBOL, 4);
-		String orderId = client.newOrder().symbol(SYMBOL)
+		NewOrderBuilder builder = client.newOrder().symbol(SYMBOL)
 				.size(new BigDecimal("1.00441")).side(Side.BUY)
 				.price(new BigDecimal("2.11551")).type(OrderType.LIMIT)
 				.timestamp(1746446247L)
-				.signParams()
-				.send();
+				.signParams();
+		
+		String orderId = builder.send();
 		
 		assertEquals(ORDER_ID, orderId);
 		
 		verify(mexcClientMock).newOrder(parametersCaptor.capture());
 		Map<String, Object> parameters = parametersCaptor.getValue();
 		assertEquals(signature, parameters.get("signature"));
+		
+		return new SignatureTestDataHolder(mac, builder);
+		
+	}
+	
+	private record SignatureTestDataHolder(Mac mac, NewOrderBuilder builder) {
+		
 	}
 
 }

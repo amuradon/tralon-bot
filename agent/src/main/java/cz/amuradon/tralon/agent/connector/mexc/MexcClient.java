@@ -57,7 +57,7 @@ public interface MexcClient {
 	@Path("/order")
 	@POST
 	@ClientHeaderParam(name = "X-MEXC-APIKEY", value = "${mexc.apiKey}")
-	@Retry(maxRetries = 0) // XXX bude to fungovat, ridi se programaticky ze strategie, resp. v runtime
+	@Retry(maxRetries = 0) // This retry needs to handled programmatically
 	OrderResponse newOrder(@RestQuery Map<String, Object> queryParams);
 	
 	@Path("/order")
@@ -83,8 +83,6 @@ public interface MexcClient {
 				return new NoValidTradePriceException(response, new BigDecimal(maxPrice), errorResponse);
 			}
 		} else if (TRANS_DIRECTION_NOT_ALLOWED.equalsIgnoreCase(errorResponse.code())) {
-			Log.infof("It is not \"Not yet trading\" error code '%s - %s', not retrying...",
-					errorResponse.code(), errorResponse.msg());
 			return new TradeDirectionNotAllowedException(response, errorResponse);
 		}
 		return new RequestException(response, errorResponse);

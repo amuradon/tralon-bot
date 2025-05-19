@@ -15,12 +15,17 @@ import io.fabric8.mockwebserver.http.Headers;
 import io.fabric8.mockwebserver.http.RecordedRequest;
 import io.fabric8.mockwebserver.utils.ResponseProvider;
 import io.quarkus.test.common.QuarkusTestResourceLifecycleManager;
-import jakarta.inject.Inject;
 
 public class MexcExchangeMock implements QuarkusTestResourceLifecycleManager {
 
 	private DefaultMockServer server;
 
+	@Override
+	public void inject(TestInjector testInjector) {
+		testInjector.injectIntoFields(server,
+				new TestInjector.AnnotatedAndMatchesType(InjectHttpServerMock.class, MockServer.class));
+	}
+	
 	@Override
 	public Map<String, String> start() {
 		final String listenKey = "pqia91ma19a5s61cv6a81va65sdf19v8a65a1a5s61cv6a81va65sdf19v8a65a1";
@@ -163,19 +168,23 @@ public class MexcExchangeMock implements QuarkusTestResourceLifecycleManager {
 		*/
 		
 		// Simplified (only in code used fields)
-		expectPost("/order", () ->
-			"""
-			{
-			    "orderId": 22542171
-			}
-			""");
 		
-		expectPost("/order?newClientOrderId=TEST", () ->
-			"""
-			{
-			    "orderId": 11542179
-			}
-			""");
+		server.expect().post().withPath("/order?newClientOrderId=ValidNewOrder")
+			.andReply(new MyResponseProvider(200, 
+					() -> "{\"orderId\": \"orderId\"}"))
+			.always();
+		server.expect().post().withPath("/order?newClientOrderId=NoValidTradePriceException")
+			.andReply(new MyResponseProvider(400, 
+					() -> "{\"code\":\"30010\", \"msg\":\"The price cannot be higher than 0.05USDT\"}"))
+			.always();
+		server.expect().post().withPath("/order?newClientOrderId=TradeDirectionNotAllowedException")
+			.andReply(new MyResponseProvider(400, 
+					() -> "{\"code\":\"30001\", \"msg\":\"The price cannot be higher than 0.05USDT\"}"))
+			.always();
+		server.expect().post().withPath("/order?newClientOrderId=TooManyRequestsError")
+			.andReply(new MyResponseProvider(429, 
+					() -> "{\"code\":\"429\", \"msg\":\"Too many requests\"}"))
+			.always();
 
 		/*
 		server.expect().withPath("/ws/" + listenKey).andUpgradeToWebSocket()
@@ -199,12 +208,6 @@ public class MexcExchangeMock implements QuarkusTestResourceLifecycleManager {
 		}
 	}
 
-	@Override
-	public void inject(TestInjector testInjector) {
-		testInjector.injectIntoFields(server,
-				new TestInjector.AnnotatedAndMatchesType(Inject.class, MockServer.class));
-	}
-	
 	private void expectGet(String path, Supplier<Object> body) {
 		server.expect().withPath(path)
 			.andReply(new MyResponseProvider(body)).always();
@@ -217,11 +220,17 @@ public class MexcExchangeMock implements QuarkusTestResourceLifecycleManager {
 	
 	private static class MyResponseProvider implements ResponseProvider<Object> {
 
+		private final int statusCode;
 		private final Supplier<Object> bodySupplier;
-		
+				
 		private Headers headers = new Headers.Builder().add("Content-Type", "application/json").build();
 		
 		public MyResponseProvider(Supplier<Object> bodySupplier) {
+			this(200, bodySupplier);
+		}
+
+		public MyResponseProvider(int statusCode, Supplier<Object> bodySupplier) {
+			this.statusCode = statusCode;
 			this.bodySupplier = bodySupplier;
 		}
 
@@ -232,7 +241,7 @@ public class MexcExchangeMock implements QuarkusTestResourceLifecycleManager {
 
 		@Override
 		public int getStatusCode(RecordedRequest request) {
-			return 200;
+			return statusCode;
 		}
 
 		@Override
