@@ -4,7 +4,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -79,6 +78,9 @@ public class NewListingStrategyTest {
 	
 	@Captor
 	private ArgumentCaptor<BigDecimal> priceCaptor;
+
+	@Captor
+	private ArgumentCaptor<String> clientOrderIdCaptor;
 	
 	@Captor
 	private ArgumentCaptor<Consumer<Trade>> tradeCallbackCaptor;
@@ -110,7 +112,7 @@ public class NewListingStrategyTest {
 	 * - nereaguje na trade updaty, dokud neni otevrena pozice
 	 */
 	@Test
-	public void testSuccessfulSend() throws Exception {
+	public void fulfillAndSell() throws Exception {
 		mockSchedulerTask(false);
 		when(newOrderBuilderMock.send()).thenReturn("orderId");
 		strategy.start();
@@ -133,22 +135,33 @@ public class NewListingStrategyTest {
 		Consumer<OrderChange> onOrderChange = orderChangeCallbackCaptor.getValue();
 		
 		long timestamp = System.currentTimeMillis();
+		
+		// No order placed yet, so below trades makes only stop price calculation
 		// Using BinanceTrade as simplest to create (record) - side and quantity don't matter as of now
-		onTrade.accept(new BinanaceTrade(new BigDecimal("0.0010"), null, null, timestamp));
-		onTrade.accept(new BinanaceTrade(new BigDecimal("0.0015"), null, null, timestamp + 1));
+		onTrade.accept(new BinanaceTrade(new BigDecimal("0.1"), null, null, timestamp));
+		onTrade.accept(new BinanaceTrade(new BigDecimal("0.15"), null, null, timestamp + 1));
 		placeNewOrder.run();
 		
 		verify(newOrderBuilderMock).send();
+		verify(newOrderBuilderMock).clientOrderId(clientOrderIdCaptor.capture());
 		
-		// Position not opened yet, no reaction...
-		onTrade.accept(new BinanaceTrade(new BigDecimal("0.0012"), null, null, timestamp + 2));
-		onTrade.accept(new BinanaceTrade(new BigDecimal("0.0011"), null, null, timestamp + 3));
+		// Position not opened yet, so below trades has no impact
+		onTrade.accept(new BinanaceTrade(new BigDecimal("0.12"), null, null, timestamp + 2));
+		onTrade.accept(new BinanaceTrade(new BigDecimal("0.11"), null, null, timestamp + 3));
 
 		// ... no sell order sent
 		verify(newOrderBuilderMock).send();
 		
 		// Using BinanceTrade as simplest to create (record) - null values don't matter as of now
-		onOrderChange.accept(new BinanceOrderChange(OrderStatus.FILLED, null, null, "", null, null, null, new BigDecimal("")));
+		onOrderChange.accept(new BinanceOrderChange(OrderStatus.FILLED, null, null, clientOrderIdCaptor.getValue(),
+				null, null, null, new BigDecimal("10")));
+		
+		// Max price was 0.15 and 15% trailing stop -> 0.1275
+		onTrade.accept(new BinanaceTrade(new BigDecimal("0.12"), null, null, timestamp + 4));
+		onTrade.accept(new BinanaceTrade(new BigDecimal("0.12"), null, null, timestamp + 6));
+		
+		verify(newOrderBuilderMock, times(2)).send();
+		verify(newOrderBuilderMock).price(new BigDecimal("0.0001"));
 	}
 
 	@Test

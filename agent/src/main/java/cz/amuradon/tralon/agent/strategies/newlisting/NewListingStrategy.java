@@ -272,6 +272,7 @@ public class NewListingStrategy implements Strategy {
 
 		if (positionOpened) {
 			
+			// TODO blocking I/O should be in different thread
 			// Caution: market order does not work in first (one?) minute, it is immediately cancelled
 			if (price.compareTo(stopPrice) <= 0) {
 				if (trade.timestamp() - lastStopPriceDrop > trailingStopDelayMs) {
@@ -281,7 +282,7 @@ public class NewListingStrategy implements Strategy {
 						.type(OrderType.LIMIT)
 						.size(baseQuantity)
 						// Emulate market order to set lowest possible limit price
-						.price(BigDecimal.ONE.scaleByPowerOfTen(symbolInfo.priceScale()))
+						.price(BigDecimal.ONE.scaleByPowerOfTen(-symbolInfo.priceScale()))
 						.send();
 					positionOpened = false;
 				} else {
