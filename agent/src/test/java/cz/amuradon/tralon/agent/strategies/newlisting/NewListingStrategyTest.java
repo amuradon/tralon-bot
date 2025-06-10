@@ -101,7 +101,8 @@ public class NewListingStrategyTest {
 		when(computeInitialPriceMock.execute(anyString(), any())).thenReturn(new BigDecimal("0.1"));
 		
 		strategy = new NewListingStrategy(scheduledExecutorServiceMock, restClientMock, websocketClientMock,
-				computeInitialPriceMock, new BigDecimal(100), SYMBOL, LocalDateTime.now().plusMinutes(5), 5, 5, 15, 1, 500);
+				computeInitialPriceMock, new BigDecimal(100), SYMBOL, LocalDateTime.now().plusMinutes(5), 5, 5,
+				new TrailingProfitStopUpdatesProcessor(restClientMock, SYMBOL, 15, 1, 500));
 	}
 
 	/*

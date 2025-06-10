@@ -26,4 +26,5 @@ public record BinanceOrderChange(
 	public BigDecimal remainingQuantity() {
 		return quantity.subtract(cumulativeQuantity);
 	}
+	
 }

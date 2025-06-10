@@ -11,16 +11,12 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-import cz.amuradon.tralon.agent.OrderStatus;
 import cz.amuradon.tralon.agent.OrderType;
 import cz.amuradon.tralon.agent.Side;
 import cz.amuradon.tralon.agent.connector.NoValidTradePriceException;
 import cz.amuradon.tralon.agent.connector.OrderBookResponse;
-import cz.amuradon.tralon.agent.connector.OrderChange;
 import cz.amuradon.tralon.agent.connector.RequestException;
 import cz.amuradon.tralon.agent.connector.RestClient;
-import cz.amuradon.tralon.agent.connector.SymbolInfo;
-import cz.amuradon.tralon.agent.connector.Trade;
 import cz.amuradon.tralon.agent.connector.TradeDirectionNotAllowedException;
 import cz.amuradon.tralon.agent.connector.WebsocketClient;
 import cz.amuradon.tralon.agent.strategies.Strategy;
@@ -47,31 +43,9 @@ public class NewListingStrategy implements Strategy {
     
     private final int listingMinute;
     
-    private final int trailingStopBelow;
-
-	private final int trailingStopDelayMs;
-	
-	private final int initialBuyOrderDelayMs;
-	
-	private boolean initialBuyValid = true;
-	
-	private boolean positionOpened = false;
-	
-	private long buyOrderPriceOverTimestamp = Long.MAX_VALUE;
-	
-	private BigDecimal baseQuantity;
-	
-	private BigDecimal maxPrice = BigDecimal.ZERO;
-	private BigDecimal stopPrice = BigDecimal.ZERO;
-	private long lastStopPriceDrop = Long.MAX_VALUE;
-	
-	private String buyOrderId;
-	
-	private String buyClientOrderId;
-	
-	private SymbolInfo symbolInfo;
-	
 	private BigDecimal initialBuyPrice;
+	
+	private final UpdatesProcessor updatesProcessor;
     
     public NewListingStrategy(
     		final ScheduledExecutorService scheduler,
@@ -83,9 +57,7 @@ public class NewListingStrategy implements Strategy {
     		final LocalDateTime listingDateTime,
     		final int buyOrderRequestsPerSecond,
     		final int buyOrderMaxAttempts,
-    		final int trailingStopBelow,   // XXX should be BigDecimal
-			final int trailingStopDelayMs,
-			final int initialBuyOrderDelayMs) {
+			final UpdatesProcessor updatesProcessor) {
 		this.scheduler = scheduler;
 		this.restClient = restClient;
 		this.websocketClient = websocketClient;
@@ -94,9 +66,7 @@ public class NewListingStrategy implements Strategy {
     	this.symbol = symbol;
     	this.buyOrderRequestsPerSecond = buyOrderRequestsPerSecond;
     	this.buyOrderMaxAttempts = buyOrderMaxAttempts;
-    	this.trailingStopBelow = trailingStopBelow;
-		this.trailingStopDelayMs = trailingStopDelayMs;
-		this.initialBuyOrderDelayMs = initialBuyOrderDelayMs;
+		this.updatesProcessor = updatesProcessor;
     	
     	listingHour = listingDateTime.getHour();
     	listingMinute = listingDateTime.getMinute();
@@ -172,9 +142,9 @@ public class NewListingStrategy implements Strategy {
 		 */
 		
 		// subscribe updates
-		symbolInfo = restClient.cacheSymbolDetails(symbol);
-		websocketClient.onTrade(this::processTradeUpdate, symbol);
-		websocketClient.onOrderChange(this::processOrderUpdate);
+		updatesProcessor.querySymbolInfo();
+		websocketClient.onTrade(updatesProcessor::processTradeUpdate, symbol);
+		websocketClient.onOrderChange(updatesProcessor::processOrderUpdate);
 		websocketClient.onAccountBalance(b -> Log.infof("Account balance update: %s", b));
 		
 		// XXX Subscribe to store to file
@@ -184,6 +154,7 @@ public class NewListingStrategy implements Strategy {
 		OrderBookResponse orderBookResponse = restClient.orderBook(symbol);
 
 		initialBuyPrice = computeInitialPrice.execute(symbol, orderBookResponse);
+		updatesProcessor.setInitialBuyPrice(initialBuyPrice);
 		Log.infof("Computed buy limit order price: %s", initialBuyPrice);
 	}
     
@@ -194,7 +165,7 @@ public class NewListingStrategy implements Strategy {
 		Log.infof("Client Order ID: %s", clientOrderId);
 		LocalDateTime now = LocalDateTime.now();
 		BigDecimal price = initialBuyPrice;
-		buyClientOrderId = clientOrderId;
+		updatesProcessor.setClientOrderId(clientOrderId);
 		long timestamp = LocalDateTime.of(now.getYear(), now.getMonthValue(), now.getDayOfMonth(),
 				listingHour, listingMinute)
 			.atZone(ZoneOffset.systemDefault()).toInstant().toEpochMilli();
@@ -231,7 +202,8 @@ public class NewListingStrategy implements Strategy {
 				Log.infof("Place new buy limit order attempt %d", i);
 				
 				try {
-					buyOrderId = newOrderBuilder.send();
+					String buyOrderId = newOrderBuilder.send();
+					updatesProcessor.setBuyOrderId(buyOrderId);
 					Log.infof("New order placed: %s", buyOrderId);
 					break;
 				} catch (NoValidTradePriceException e) {
@@ -260,66 +232,5 @@ public class NewListingStrategy implements Strategy {
 				}
 			}
 		}
-	}
-	
-	private void processTradeUpdate(Trade trade) {
-		BigDecimal price = trade.price();
-		if (price.compareTo(maxPrice) > 0) {
-			maxPrice = trade.price();
-			stopPrice = maxPrice.multiply(new BigDecimal(100 - trailingStopBelow))
-					.divide(new BigDecimal(100), symbolInfo.priceScale(), RoundingMode.DOWN);
-		}
-
-		if (positionOpened) {
-			
-			// TODO blocking I/O should be in different thread
-			// Caution: market order does not work in first (one?) minute, it is immediately cancelled
-			if (price.compareTo(stopPrice) <= 0) {
-				if (trade.timestamp() - lastStopPriceDrop > trailingStopDelayMs) {
-					restClient.newOrder()
-						.symbol(symbol)
-						.side(Side.SELL)
-						.type(OrderType.LIMIT)
-						.size(baseQuantity)
-						// Emulate market order to set lowest possible limit price
-						.price(BigDecimal.ONE.scaleByPowerOfTen(-symbolInfo.priceScale()))
-						.send();
-					positionOpened = false;
-				} else {
-					lastStopPriceDrop = trade.timestamp();
-				}
-			} else {
-				lastStopPriceDrop = Long.MAX_VALUE;
-			}
-			
-			// If there is still at least partial of initial buy order
-			if (initialBuyValid) {
-				if (trade.price().compareTo(initialBuyPrice) > 0) {
-					buyOrderPriceOverTimestamp = Math.min(buyOrderPriceOverTimestamp, trade.timestamp());
-					if (System.currentTimeMillis() - buyOrderPriceOverTimestamp > initialBuyOrderDelayMs) {
-						restClient.cancelOrder(buyOrderId, symbol);
-						initialBuyValid = false;
-					}
-				} else {
-					buyOrderPriceOverTimestamp = Long.MAX_VALUE;
-				}
-			}
-		}
-	}
-	
-	private void processOrderUpdate(OrderChange orderChange) {
-		Log.infof("Order update: %s", orderChange);
-		if (orderChange.clientOrderId().equalsIgnoreCase(buyClientOrderId)){
-			if (orderChange.status() == OrderStatus.PARTIALLY_FILLED) {
-				positionOpened = true;
-				baseQuantity = orderChange.cumulativeQuantity();
-			} else if (orderChange.status() == OrderStatus.FILLED) {
-				positionOpened = true;
-				initialBuyValid = false;
-				baseQuantity = orderChange.cumulativeQuantity();
-			} else if (orderChange.status() == OrderStatus.CANCELED) {
-				initialBuyValid = false;
-			}
-		 }
 	}
 }

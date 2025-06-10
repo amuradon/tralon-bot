@@ -35,16 +35,25 @@
 	</label>
 	<input name="buyOrderMaxAttempts" type="number" value="20"/>
 	
-	<label for="trailingStopBelow">Trailing stop below max price (%):</label>
-	<input name="trailingStopBelow" type="number" step="any" value="25"/>
-	
-	<label for="trailingStopDelayMs">Trailing stop execution delay (ms):</label>
-	<input name="trailingStopDelayMs" type="number" value="150"/>
-	
 	<label for="initialBuyOrderValidityMs" title="To avoid buying remaining quantity if the price is already falling">
 		Validity period of initial buy order (ms):
 	</label>
 	<input name="initialBuyOrderValidityMs" type="number" value="500"/>
+	
+	<label for="takeProfitStopLoss">Take profit and stop loss:</label>
+	<textarea name="takeProfitStopLoss" rows="12">
+	# Type = fixed|trailing
+	type=fixed
+	
+	# PT % - not used for trailing but has to be present
+	takeProfit=10
+	
+	# SL %
+	stopLoss=10
+	
+	# Delay in ms after reaching SL price to execute SL - to ignore individual dips
+	stopLossDelayMs=200
+	</textarea>
 	
 	<label for="storeData">Store Data:</label>
 	<input id="storeDataTrue" name="storeData" type="radio" value="true" checked="checked"/>

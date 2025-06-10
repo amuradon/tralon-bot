@@ -1,12 +1,16 @@
 package cz.amuradon.tralon.master.web;
 
+import java.io.IOException;
+import java.io.StringReader;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.function.TriFunction;
@@ -21,7 +25,10 @@ import cz.amuradon.tralon.agent.strategies.StrategyFactory;
 import cz.amuradon.tralon.agent.strategies.marketmaking.MarketMakingStrategy;
 import cz.amuradon.tralon.agent.strategies.marketmaking.SpreadStrategies;
 import cz.amuradon.tralon.agent.strategies.newlisting.ComputeInitialPrice;
+import cz.amuradon.tralon.agent.strategies.newlisting.FixedPercentClosePositionUpdatesProcessor;
 import cz.amuradon.tralon.agent.strategies.newlisting.NewListingStrategy;
+import cz.amuradon.tralon.agent.strategies.newlisting.TrailingProfitStopUpdatesProcessor;
+import cz.amuradon.tralon.agent.strategies.newlisting.UpdatesProcessor;
 import io.quarkus.logging.Log;
 import io.quarkus.qute.CheckedTemplate;
 import io.quarkus.qute.TemplateInstance;
@@ -149,21 +156,43 @@ public class MainPageResource {
 			@RestForm LocalDateTime listingDateTime,
 			@RestForm int buyOrderRequestsPerSecond,
 			@RestForm int buyOrderMaxAttempts,
-			@RestForm int trailingStopBelow,
-			@RestForm int trailingStopDelayMs,
+			@RestForm String takeProfitStopLoss,
 			@RestForm int initialBuyOrderValidityMs,
 			@RestForm boolean storeData) {
 		boolean checked = logAndCheck("buyOrderRequestsPerSecond", buyOrderRequestsPerSecond);
 		checked &= logAndCheck("buyOrderMaxAttempts", buyOrderMaxAttempts);
-		checked &= logAndCheck("trailingStopBelow", trailingStopBelow);
-		checked &= logAndCheck("trailingStopDelayMs", trailingStopDelayMs);
 		checked &= logAndCheck("initialBuyOrderValidityMs", initialBuyOrderValidityMs);
+		
+		Properties properties = new Properties();
+		try {
+			properties.load(new StringReader(takeProfitStopLoss));
+		} catch (IOException e) {
+			throw new IllegalStateException("Could not parse TP / SL properties", e);
+		}
+		String tpSlType = properties.getProperty("type");
+		int takeProfit = Integer.parseInt(properties.getProperty("takeProfit"));
+		int stopLoss = Integer.parseInt(properties.getProperty("stopLoss"));
+		int stopLossDelayMs = Integer.parseInt(properties.getProperty("stopLossDelayMs"));
+		
+		BiFunction<RestClient, String, UpdatesProcessor> updatesProcessorFactory = switch (tpSlType) {
+		case "fixed": {
+			yield (r, s) -> new FixedPercentClosePositionUpdatesProcessor(r, s, takeProfit, stopLoss, stopLossDelayMs, initialBuyOrderValidityMs);
+		}
+		case "trailing": {
+			yield (r, s) -> new TrailingProfitStopUpdatesProcessor(r, s, stopLoss, stopLossDelayMs, initialBuyOrderValidityMs);
+		}
+		default:
+			throw new IllegalArgumentException("Unexpected value: " + tpSlType
+					+ ". Allowed values are 'fixed' or 'trailing'");
+		};
+		
+		
 		Log.infof("storeData: %s", storeData);
 		if (checked) {
 			return runStrategy(exchangeName, baseAsset, quoteAsset, storeData,
 					(r, w, s) -> new NewListingStrategy(scheduler, r, w,
 					new ComputeInitialPrice(priceExpr), quoteQuantity, s, listingDateTime, buyOrderRequestsPerSecond,
-					buyOrderMaxAttempts, trailingStopBelow, trailingStopDelayMs, initialBuyOrderValidityMs));
+					buyOrderMaxAttempts, updatesProcessorFactory.apply(r, s)));
 		} else {
 			return Templates.runningStrategies(runningStrategies);
 		}
