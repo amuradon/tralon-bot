@@ -83,10 +83,10 @@ public class MexcRestClientAdapter implements RestClient {
 	
 	@Override
 	public void cancelOrder(String orderId, String symbol) {
-    	mexcClient.cancelOrder(
+    	mexcClient.cancelOrder(signQueryParams(
     			param("timestamp", new Date().getTime())
     			.param("symbol", symbol)
-    			.param("orderId", orderId));
+    			.param("orderId", orderId)));
 	}
 
 	@Override
