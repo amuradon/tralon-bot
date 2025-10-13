@@ -19,7 +19,7 @@ import org.jboss.resteasy.reactive.RestForm;
 import cz.amuradon.tralon.agent.connector.Exchange;
 import cz.amuradon.tralon.agent.connector.RestClient;
 import cz.amuradon.tralon.agent.connector.WebsocketClient;
-import cz.amuradon.tralon.agent.strategies.DualInvestmentSpotHedgeStrategy;
+import cz.amuradon.tralon.agent.strategies.MomentumScannerStrategy;
 import cz.amuradon.tralon.agent.strategies.Strategy;
 import cz.amuradon.tralon.agent.strategies.StrategyFactory;
 import cz.amuradon.tralon.agent.strategies.marketmaking.MarketMakingStrategy;
@@ -47,7 +47,7 @@ import jakarta.ws.rs.core.MediaType;
 public class MainPageResource {
 
 	private static final String MARKET_MAKING = "Market Making";
-	private static final String SPOT_HEDGE = "Dual Investment Spot Hedge";
+	private static final String MOMENTUM_SCANNER = "Momentum Scanner";
 	private static final String NEW_LISTING = "New Listing";
 
 	private final StrategyFactory strategyFactory;
@@ -77,7 +77,7 @@ public class MainPageResource {
 	@GET
 	@Produces(MediaType.TEXT_HTML)
 	public TemplateInstance index() {
-		return Templates.index(Arrays.asList(SPOT_HEDGE, MARKET_MAKING, NEW_LISTING));
+		return Templates.index(Arrays.asList(MOMENTUM_SCANNER, MARKET_MAKING, NEW_LISTING));
 	}
 
 	@GET
@@ -106,8 +106,8 @@ public class MainPageResource {
 	@Produces(MediaType.TEXT_HTML)
 	public TemplateInstance runSpotHedge(@RestForm String strategy) {
 		Log.infof("Chosen strategy: %s", strategy);
-		if (strategy.equalsIgnoreCase(SPOT_HEDGE)) {
-			return Templates.dualInvestmentSpotHedge(supportedExchanges);
+		if (strategy.equalsIgnoreCase(MOMENTUM_SCANNER)) {
+			return Templates.momentumScanner(supportedExchanges);
 		} else if (strategy.equalsIgnoreCase(MARKET_MAKING)) {
 			return Templates.marketMaking(supportedExchanges, Arrays.stream(SpreadStrategies.values())
 					.collect(Collectors.toMap(e -> e.displayName(), e -> e.valueCaption())));
@@ -119,15 +119,11 @@ public class MainPageResource {
 	}
 
 	@POST
-	@Path("/run-spot-hedge")
+	@Path("/run-momentum-scanner")
 	@Produces(MediaType.TEXT_HTML)
-	public TemplateInstance runSpotHedge(@RestForm String exchangeName, @RestForm LocalDateTime endDateTime,
-			@RestForm String baseAsset, @RestForm String quoteAsset, @RestForm BigDecimal price,
-			@RestForm BigDecimal baseQuantity, @RestForm BigDecimal mmSpread,
-			@RestForm BigDecimal apr, @RestForm int priceChangeDelayMs) {
-		return runStrategy(exchangeName, baseAsset, quoteAsset, false, (r, w, s) ->
-				new DualInvestmentSpotHedgeStrategy(r, w, baseAsset, quoteAsset, s,
-						price, baseQuantity, mmSpread, apr, priceChangeDelayMs));
+	public TemplateInstance runSpotHedge(@RestForm String exchangeName, @RestForm int priceDelta) {
+		return runStrategy(exchangeName, "0", "0", false, (r, w, s) ->
+				new MomentumScannerStrategy(r, scheduler, priceDelta));
 	}
 
 	@POST
@@ -240,7 +236,7 @@ public class MainPageResource {
 	public static class Templates {
 		public static native TemplateInstance index(List<String> strategies);
 		public static native TemplateInstance runningStrategies(Map<String, Strategy> runningStrategies);
-		public static native TemplateInstance dualInvestmentSpotHedge(List<String> exchanges);
+		public static native TemplateInstance momentumScanner(List<String> exchanges);
 		public static native TemplateInstance marketMaking(List<String> exchanges, Map<String, String> spreadStrategies);
 		public static native TemplateInstance newListing(List<String> exchanges);
 		public static native TemplateInstance noneStrategy();

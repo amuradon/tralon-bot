@@ -10,6 +10,7 @@ import java.util.stream.Collectors;
 
 import com.kucoin.sdk.rest.request.OrderCreateApiRequest;
 import com.kucoin.sdk.rest.request.OrderCreateApiRequest.OrderCreateApiRequestBuilder;
+import com.kucoin.sdk.rest.response.AllTickersResponse;
 import com.kucoin.sdk.rest.response.SymbolResponse;
 
 import cz.amuradon.tralon.agent.OrderType;
@@ -21,6 +22,7 @@ import cz.amuradon.tralon.agent.connector.RestClient;
 import cz.amuradon.tralon.agent.connector.RestClientFactory;
 import cz.amuradon.tralon.agent.connector.RestClientListener;
 import cz.amuradon.tralon.agent.connector.SymbolInfo;
+import cz.amuradon.tralon.agent.connector.Ticker;
 import cz.amuradon.tralon.agent.model.Order;
 import cz.amuradon.tralon.agent.model.OrderImpl;
 import io.quarkus.logging.Log;
@@ -111,6 +113,17 @@ public class KucoinRestClient implements RestClient {
 	public String userDataStream() {
 		// Kucoin's websocket clients handle this internally, REST client does not seem to even provide it
 		throw new UnsupportedOperationException("KucoinRestClient#userDataStream not available. Was not needed so far");
+	}
+	
+	@Override
+	public Ticker[] ticker() {
+		try {
+			AllTickersResponse allTickers = restClient.symbolAPI().getAllTickers();
+			return allTickers.getTicker().stream().map(t -> new KucoinTicker(t, allTickers.getTime()))
+					.toArray(KucoinTicker[]::new);
+		} catch (IOException e) {
+			throw new IllegalStateException("Could not get 24h ticker.", e);
+		}
 	}
 	
 	@Override

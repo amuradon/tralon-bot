@@ -24,6 +24,8 @@ public interface RestClient {
 
 	String userDataStream();
 	
+	Ticker[] ticker();
+	
 	void setListener(RestClientListener listener);
 
 	interface NewOrderBuilder {

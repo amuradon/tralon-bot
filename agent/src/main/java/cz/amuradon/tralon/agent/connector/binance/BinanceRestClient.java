@@ -4,6 +4,7 @@ import static cz.amuradon.tralon.agent.connector.RequestUtils.param;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -25,6 +26,7 @@ import cz.amuradon.tralon.agent.connector.OrderBookResponseImpl;
 import cz.amuradon.tralon.agent.connector.RestClient;
 import cz.amuradon.tralon.agent.connector.RestClientFactory;
 import cz.amuradon.tralon.agent.connector.RestClientListener;
+import cz.amuradon.tralon.agent.connector.Ticker;
 import cz.amuradon.tralon.agent.model.Order;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.Dependent;
@@ -129,6 +131,15 @@ public class BinanceRestClient implements RestClient {
 			return mapper.readValue(spotClient.createUserData().createListenKey(), ListenKey.class).listenKey();
 		} catch (JsonProcessingException e) {
 			throw new IllegalStateException("Could not read listen key.", e);
+		}
+	}
+	
+	@Override
+	public Ticker[] ticker() {
+		try {
+			return mapper.readValue(spotClient.createMarket().ticker24H(Collections.emptyMap()), BinanceTicker[].class);
+		} catch (JsonProcessingException e) {
+			throw new IllegalStateException("Could not read 24h ticker.", e);
 		}
 	}
 	

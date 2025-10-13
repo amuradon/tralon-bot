@@ -122,7 +122,7 @@ public class BinanceWebsocketClient implements WebsocketClient {
 		client.tradeStream(symbol, data -> {
 			try {
 				listener.onTrade(symbol, data.getBytes(StandardCharsets.UTF_8));
-				callback.accept(mapper.readValue(data, BinanaceTrade.class));
+				callback.accept(mapper.readValue(data, BinanceTrade.class));
 			} catch (JsonProcessingException e) {
 				throw new IllegalStateException("Could not parse Websocket JSON", e);
 			}

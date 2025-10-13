@@ -40,7 +40,7 @@ import cz.amuradon.tralon.agent.connector.SymbolInfo;
 import cz.amuradon.tralon.agent.connector.Trade;
 import cz.amuradon.tralon.agent.connector.TradeDirectionNotAllowedException;
 import cz.amuradon.tralon.agent.connector.WebsocketClient;
-import cz.amuradon.tralon.agent.connector.binance.BinanaceTrade;
+import cz.amuradon.tralon.agent.connector.binance.BinanceTrade;
 import cz.amuradon.tralon.agent.connector.binance.BinanceOrderChange;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
@@ -139,16 +139,16 @@ public class NewListingStrategyTest {
 		
 		// No order placed yet, so below trades makes only stop price calculation
 		// Using BinanceTrade as simplest to create (record) - side and quantity don't matter as of now
-		onTrade.accept(new BinanaceTrade(new BigDecimal("0.1"), null, null, timestamp));
-		onTrade.accept(new BinanaceTrade(new BigDecimal("0.15"), null, null, timestamp + 1));
+		onTrade.accept(new BinanceTrade(new BigDecimal("0.1"), null, null, timestamp));
+		onTrade.accept(new BinanceTrade(new BigDecimal("0.15"), null, null, timestamp + 1));
 		placeNewOrder.run();
 		
 		verify(newOrderBuilderMock).send();
 		verify(newOrderBuilderMock).clientOrderId(clientOrderIdCaptor.capture());
 		
 		// Position not opened yet, so below trades has no impact
-		onTrade.accept(new BinanaceTrade(new BigDecimal("0.12"), null, null, timestamp + 2));
-		onTrade.accept(new BinanaceTrade(new BigDecimal("0.11"), null, null, timestamp + 3));
+		onTrade.accept(new BinanceTrade(new BigDecimal("0.12"), null, null, timestamp + 2));
+		onTrade.accept(new BinanceTrade(new BigDecimal("0.11"), null, null, timestamp + 3));
 
 		// ... no sell order sent
 		verify(newOrderBuilderMock).send();
@@ -158,8 +158,8 @@ public class NewListingStrategyTest {
 				null, null, null, new BigDecimal("10")));
 		
 		// Max price was 0.15 and 15% trailing stop -> 0.1275
-		onTrade.accept(new BinanaceTrade(new BigDecimal("0.12"), null, null, timestamp + 4));
-		onTrade.accept(new BinanaceTrade(new BigDecimal("0.12"), null, null, timestamp + 6));
+		onTrade.accept(new BinanceTrade(new BigDecimal("0.12"), null, null, timestamp + 4));
+		onTrade.accept(new BinanceTrade(new BigDecimal("0.12"), null, null, timestamp + 6));
 		
 		verify(newOrderBuilderMock, times(2)).send();
 		verify(newOrderBuilderMock).price(new BigDecimal("0.0001"));

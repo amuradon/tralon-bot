@@ -33,6 +33,7 @@ import cz.amuradon.tralon.agent.connector.OrderBookResponseImpl;
 import cz.amuradon.tralon.agent.connector.RestClient;
 import cz.amuradon.tralon.agent.connector.RestClientFactory;
 import cz.amuradon.tralon.agent.connector.RestClientListener;
+import cz.amuradon.tralon.agent.connector.Ticker;
 import cz.amuradon.tralon.agent.model.Order;
 import jakarta.enterprise.context.Dependent;
 import jakarta.inject.Inject;
@@ -155,6 +156,11 @@ public class MexcRestClientAdapter implements RestClient {
 	@Override
 	public String userDataStream() {
 		return mexcClient.userDataStream(signQueryParams(param("timestamp", new Date().getTime()))).listenKey();
+	}
+	
+	@Override
+	public Ticker[] ticker() {
+		return mexcClient.ticker();
 	}
 	
 	@Override

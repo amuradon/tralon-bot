@@ -7,7 +7,9 @@
 	<packaging>pom</packaging>
 
 	<properties>
-		<quarkus.platform.version>3.22.1</quarkus.platform.version>
+		<quarkus.platform.version>3.26.4</quarkus.platform.version>
+		<!-- Needs to be the same as defined in Quarkus BOM -->
+		<mockito.version>5.18.0</mockito.version>
 	</properties>
 
 	<dependencyManagement>
@@ -67,8 +69,10 @@
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-surefire-plugin</artifactId>
-					<version>3.5.2</version>
+					<version>3.5.4</version>
 					<configuration>
+						<!-- For unknown reason -javaagent:${org.mockito:mockito-core:jar} does not work  -->
+						<argLine>-javaagent:${settings.localRepository}/org/mockito/mockito-core/${mockito.version}/mockito-core-${mockito.version}.jar</argLine>
 						<systemPropertyVariables>
 							<java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager> 
 							<maven.home>${env.M2_HOME}</maven.home>

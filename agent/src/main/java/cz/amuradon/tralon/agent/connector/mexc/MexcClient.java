@@ -38,6 +38,10 @@ public interface MexcClient {
 	@Path("/exchangeInfo")
 	@GET
 	String exchangeInfo(@RestQuery String symbol);
+	
+	@Path("/ticker/24hr")
+	@GET
+	MexcTicker[] ticker();
 
 	@Path("/depth")
 	@GET
