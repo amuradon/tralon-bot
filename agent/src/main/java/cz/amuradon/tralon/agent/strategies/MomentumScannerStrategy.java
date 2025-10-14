@@ -9,19 +9,22 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
+import cz.amuradon.tralon.agent.connector.Exchange;
 import cz.amuradon.tralon.agent.connector.RestClient;
 import cz.amuradon.tralon.agent.connector.Ticker;
 import io.quarkus.logging.Log;
 
 public class MomentumScannerStrategy implements Strategy {
 
+	private final Exchange exchange;
 	private final RestClient restClient;
 	private final ScheduledExecutorService scheduler;
 	private final int priceDelta;
 	private final Map<String, LinkedList<SymbolValues>> movingValues;
 	private ScheduledFuture<?> task;
 	
-	public MomentumScannerStrategy(RestClient restClient, final ScheduledExecutorService scheduler, int priceDelta) {
+	public MomentumScannerStrategy(Exchange exchange, RestClient restClient, final ScheduledExecutorService scheduler, int priceDelta) {
+		this.exchange = exchange;
 		this.restClient = restClient;
 		this.scheduler = scheduler;
 		this.priceDelta = priceDelta;
@@ -68,7 +71,8 @@ public class MomentumScannerStrategy implements Strategy {
 					BigDecimal m1VolumeChange = getPercentage(quoteVolume, m1.quoteVolume());
 					BigDecimal m5VolumeChange = getPercentage(quoteVolume, m5.quoteVolume());
 					BigDecimal m15VolumeChange = getPercentage(quoteVolume, m15.quoteVolume());
-					Log.infof("Symbol %s, 1p: %s, 5p: %s, 15p: %s, 1v: %s, 5v: %s, 15v: %s", ticker.symbol(),
+					Log.infof("%s Symbol %s, 1p: %s, 5p: %s, 15p: %s, 1v: %s, 5v: %s, 15v: %s", exchange.displayName(),
+							ticker.symbol(),
 							m1PriceChange, m5PriceChange, m15PriceChange, m1VolumeChange, m5VolumeChange,
 							m15VolumeChange);
 				}
@@ -91,7 +95,7 @@ public class MomentumScannerStrategy implements Strategy {
 	}
 	
 	private boolean filter(Ticker ticker) {
-		return ticker.symbol().endsWith("USDT") && ticker.quoteVolume().compareTo(BigDecimal.valueOf(1000000)) == 1;
+		return exchange.momentumTokenfilter(ticker) && ticker.quoteVolume().compareTo(BigDecimal.valueOf(1000000)) == 1;
 	}
 
 	@Override

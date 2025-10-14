@@ -64,7 +64,7 @@ public class BinanceAlphaRestClient implements RestClient {
 
 	@Override
 	public Ticker[] ticker() {
-		return client.ticker().data();
+		return client.ticker().data()   ;
 	}
 
 	@Override

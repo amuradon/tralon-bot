@@ -122,8 +122,9 @@ public class MainPageResource {
 	@Path("/run-momentum-scanner")
 	@Produces(MediaType.TEXT_HTML)
 	public TemplateInstance runSpotHedge(@RestForm String exchangeName, @RestForm int priceDelta) {
+		final Exchange exchange = Exchange.fromDisplayName(exchangeName);
 		return runStrategy(exchangeName, "0", "0", false, (r, w, s) ->
-				new MomentumScannerStrategy(r, scheduler, priceDelta));
+				new MomentumScannerStrategy(exchange, r, scheduler, priceDelta));
 	}
 
 	@POST

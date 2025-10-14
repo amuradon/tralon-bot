@@ -4,13 +4,19 @@ import java.lang.annotation.Annotation;
 
 import cz.amuradon.tralon.agent.connector.binance.Binance;
 import cz.amuradon.tralon.agent.connector.binancealpha.BinanceAlpha;
+import cz.amuradon.tralon.agent.connector.binancealpha.BinanceAlphaTicker;
 import cz.amuradon.tralon.agent.connector.kucoin.Kucoin;
 import cz.amuradon.tralon.agent.connector.mexc.Mexc;
 
 public enum Exchange {
 
 	BINANCE("Binance", Binance.LITERAL),
-	BINANCE_ALPHA("Binance Alpha", BinanceAlpha.LITERAL),
+	BINANCE_ALPHA("Binance Alpha", BinanceAlpha.LITERAL) {
+		@Override
+		public boolean momentumTokenfilter(Ticker ticker) {
+			return !((BinanceAlphaTicker) ticker).listingCex(); 
+		}
+	},
 	KUCOIN("Kucoin", Kucoin.LITERAL) {
 		@Override
 		public String symbol(String baseAsset, String quoteAsset) {
@@ -55,5 +61,9 @@ public enum Exchange {
 
 	public String getWebsocketDataFileExtesion() {
 		return "json";
+	}
+	
+	public boolean momentumTokenfilter(Ticker ticker) {
+		return ticker.symbol().endsWith("USDT");
 	}
 }

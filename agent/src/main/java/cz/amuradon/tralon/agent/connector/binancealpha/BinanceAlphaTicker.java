@@ -10,7 +10,8 @@ import cz.amuradon.tralon.agent.connector.Ticker;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record BinanceAlphaTicker(String symbol,
 		@JsonProperty("price") BigDecimal lastPrice,
-		@JsonProperty("volume24h") BigDecimal quoteVolume) implements Ticker {
+		@JsonProperty("volume24h") BigDecimal quoteVolume,
+		boolean listingCex) implements Ticker {
 	// XXX volumes jsou nejaky divny
 	
 	@Override
