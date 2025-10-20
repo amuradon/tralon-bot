@@ -14,8 +14,10 @@ import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.function.TriFunction;
+import org.eclipse.microprofile.reactive.messaging.Channel;
 import org.jboss.resteasy.reactive.RestForm;
 
+import cz.amuradon.tralon.agent.Notification;
 import cz.amuradon.tralon.agent.connector.Exchange;
 import cz.amuradon.tralon.agent.connector.RestClient;
 import cz.amuradon.tralon.agent.connector.WebsocketClient;
@@ -33,6 +35,7 @@ import io.quarkus.logging.Log;
 import io.quarkus.qute.CheckedTemplate;
 import io.quarkus.qute.TemplateInstance;
 import io.quarkus.runtime.Shutdown;
+import io.smallrye.reactive.messaging.MutinyEmitter;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.BadRequestException;
@@ -58,15 +61,18 @@ public class MainPageResource {
 	
 	private final ScheduledExecutorService scheduler;
 	
+	private MutinyEmitter<Notification> notificationEmmitter;
 	
 	// XXX As of now agent as dep, in future managed by Kubernetes #24
 	@Inject
 	public MainPageResource(final StrategyFactory strategyFactory,
-			final ScheduledExecutorService scheduler) {
+			final ScheduledExecutorService scheduler,
+			@Channel("notifications") final MutinyEmitter<Notification> notificationEmmitter) {
 		this.strategyFactory = strategyFactory;
 		runningStrategies = new ConcurrentSkipListMap<>();
 		supportedExchanges = Arrays.stream(Exchange.values()).map(Exchange::displayName).collect(Collectors.toList());
 		this.scheduler = scheduler;
+		this.notificationEmmitter = notificationEmmitter;
 	}
 	
 	@Shutdown
@@ -124,7 +130,7 @@ public class MainPageResource {
 	public TemplateInstance runSpotHedge(@RestForm String exchangeName, @RestForm int priceDelta) {
 		final Exchange exchange = Exchange.fromDisplayName(exchangeName);
 		return runStrategy(exchangeName, "0", "0", false, (r, w, s) ->
-				new MomentumScannerStrategy(exchange, r, scheduler, priceDelta));
+				new MomentumScannerStrategy(exchange, r, scheduler, priceDelta, notificationEmmitter));
 	}
 
 	@POST

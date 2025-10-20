@@ -3,16 +3,21 @@ package cz.amuradon.tralon.agent.strategies;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
+import cz.amuradon.tralon.agent.Notification;
 import cz.amuradon.tralon.agent.connector.Exchange;
 import cz.amuradon.tralon.agent.connector.RestClient;
 import cz.amuradon.tralon.agent.connector.Ticker;
 import io.quarkus.logging.Log;
+import io.smallrye.reactive.messaging.MutinyEmitter;
+import jakarta.inject.Inject;
 
 public class MomentumScannerStrategy implements Strategy {
 
@@ -21,14 +26,19 @@ public class MomentumScannerStrategy implements Strategy {
 	private final ScheduledExecutorService scheduler;
 	private final int priceDelta;
 	private final Map<String, LinkedList<SymbolValues>> movingValues;
+	private final MutinyEmitter<Notification> notificationEmmitter;
+	private final Set<String> reported; 
 	private ScheduledFuture<?> task;
 	
-	public MomentumScannerStrategy(Exchange exchange, RestClient restClient, final ScheduledExecutorService scheduler, int priceDelta) {
+	public MomentumScannerStrategy(Exchange exchange, RestClient restClient, final ScheduledExecutorService scheduler,
+			int priceDelta, MutinyEmitter<Notification> notificationEmmitter) {
 		this.exchange = exchange;
 		this.restClient = restClient;
 		this.scheduler = scheduler;
 		this.priceDelta = priceDelta;
 		this.movingValues = new HashMap<>();
+		this.notificationEmmitter = notificationEmmitter;
+		reported = new HashSet<>();
 	}
 
 	@Override
@@ -53,9 +63,11 @@ public class MomentumScannerStrategy implements Strategy {
 	
 	void scan() {
 		Ticker[] tickers = restClient.ticker();
+		Set<String> reportingThisCycle = new HashSet<>();
 		for (Ticker ticker : tickers) {
 			if (filter(ticker)) {
-				LinkedList<SymbolValues> values = movingValues.computeIfAbsent(ticker.symbol(), k -> initiateValues(ticker));
+				String symbol = ticker.symbol();
+				LinkedList<SymbolValues> values = movingValues.computeIfAbsent(symbol, k -> initiateValues(ticker));
 				SymbolValues m15 = values.getFirst();
 				SymbolValues m5 = values.get(9);
 				SymbolValues m1 = values.getLast();
@@ -71,15 +83,26 @@ public class MomentumScannerStrategy implements Strategy {
 					BigDecimal m1VolumeChange = getPercentage(quoteVolume, m1.quoteVolume());
 					BigDecimal m5VolumeChange = getPercentage(quoteVolume, m5.quoteVolume());
 					BigDecimal m15VolumeChange = getPercentage(quoteVolume, m15.quoteVolume());
+					reportingThisCycle.add(symbol);
 					Log.infof("%s Symbol %s, 1p: %s, 5p: %s, 15p: %s, 1v: %s, 5v: %s, 15v: %s", exchange.displayName(),
-							ticker.symbol(),
+							symbol,
 							m1PriceChange, m5PriceChange, m15PriceChange, m1VolumeChange, m5VolumeChange,
 							m15VolumeChange);
+					
+					if (!reported.contains(symbol)) {
+						notificationEmmitter.sendAndForget(new Notification("New Momentum symbol",
+								String.format("%s Symbol %s, 1p: %s, 5p: %s, 15p: %s, 1v: %s, 5v: %s, 15v: %s", exchange.displayName(),
+								symbol,
+								m1PriceChange, m5PriceChange, m15PriceChange, m1VolumeChange, m5VolumeChange,
+								m15VolumeChange)));
+					}
 				}
 				values.removeFirst();
 				values.addLast(new SymbolValues(ticker.lastPrice(), ticker.quoteVolume()));
 			}
 		}
+		reported.clear();
+		reported.addAll(reportingThisCycle);
 	}
 
 	private BigDecimal getPercentage(BigDecimal current, BigDecimal previous) {
