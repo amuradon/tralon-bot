@@ -1,0 +1,30 @@
+{@java.lang.String[] strategies}
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Tralon: Scanner</title>
+  <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css">
+  <script src="https://unpkg.com/htmx.org@2.0.7"></script>
+  <script src="https://unpkg.com/htmx-ext-sse@2.2.4"></script>
+</head>
+<body>
+<h1>Tralon: Scanner</h1>
+<div hx-ext="sse" sse-connect="/notifications" sse-swap="message">
+  <div hx-get="/scanner/table" hx-trigger="sse:message"></div>
+</div>
+  <script type="text/javascript">
+  	window.onload = () => {
+  		var alert = new Audio("light-hearted-message-tone.ogg");
+  		document.body.addEventListener('htmx:sseMessage', function (e) {
+		 	alert.play();
+  			if (Notification.permission === 'granted') {
+  		  		new Notification(e.detail.data, { body: e.detail.data });
+  			}
+  		});
+  		
+  	};
+  </script>
+</body>
+</html>

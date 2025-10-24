@@ -90,6 +90,7 @@ public class MomentumScannerStrategy implements Strategy {
 							m15VolumeChange);
 					
 					if (!reported.contains(symbol)) {
+						Log.infof("Notifying %s %s", exchange.displayName(), symbol);
 						notificationEmmitter.sendAndForget(new Notification("New Momentum symbol",
 								String.format("%s Symbol %s, 1p: %s, 5p: %s, 15p: %s, 1v: %s, 5v: %s, 15v: %s", exchange.displayName(),
 								symbol,
@@ -129,6 +130,11 @@ public class MomentumScannerStrategy implements Strategy {
 	@Override
 	public String getDescription() {
 		return "Momentum scanner";
+	}
+
+	@Override
+	public String link() {
+		return "/scanner";
 	}
 
 }

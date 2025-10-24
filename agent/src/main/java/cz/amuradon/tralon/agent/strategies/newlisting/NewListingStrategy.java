@@ -233,4 +233,9 @@ public class NewListingStrategy implements Strategy {
 			}
 		}
 	}
+
+	@Override
+	public String link() {
+		return "";
+	}
 }

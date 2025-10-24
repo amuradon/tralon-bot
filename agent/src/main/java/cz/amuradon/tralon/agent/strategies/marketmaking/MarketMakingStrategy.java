@@ -301,4 +301,9 @@ public class MarketMakingStrategy implements Strategy {
 				+ " , max balance to use: %s, spread: %",
 				getClass().getSimpleName(), baseAsset, quoteAsset, priceChangeDelayMs, maxQuoteBalanceToUse, spreadCalculator.describe());
 	}
+
+	@Override
+	public String link() {
+		return "";
+	}
 }

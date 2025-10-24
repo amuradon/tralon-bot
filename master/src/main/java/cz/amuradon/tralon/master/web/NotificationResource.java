@@ -11,6 +11,7 @@ import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.core.MediaType;
 
+
 @Path("/notifications")
 @ApplicationScoped
 public class NotificationResource {
@@ -19,6 +20,8 @@ public class NotificationResource {
 	@Channel("notifications")
 	Multi<Notification> notifications;
 	
+	// FIXME Asi to neposila jako JSON 
+	// MessageEvent {isTrusted: true, data: 'Notification[title=New token, body=Some token]', origin: 'http://localhost:9091', lastEventId: '', source: null, …}
 	@GET
 	@RestStreamElementType(MediaType.APPLICATION_JSON)
 	public Multi<Notification> stream() {

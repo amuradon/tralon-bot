@@ -63,6 +63,8 @@ public class MainPageResource {
 	
 	private MutinyEmitter<Notification> notificationEmmitter;
 	
+	int counter;
+	
 	// XXX As of now agent as dep, in future managed by Kubernetes #24
 	@Inject
 	public MainPageResource(final StrategyFactory strategyFactory,

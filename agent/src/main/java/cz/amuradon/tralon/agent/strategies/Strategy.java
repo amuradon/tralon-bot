@@ -7,4 +7,6 @@ public interface Strategy {
 	void stop();
 	
 	String getDescription();
+	
+	String link();
 }
