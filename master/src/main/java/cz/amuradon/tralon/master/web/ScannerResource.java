@@ -1,47 +1,20 @@
 package cz.amuradon.tralon.master.web;
 
-import java.io.IOException;
-import java.io.StringReader;
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.concurrent.ConcurrentSkipListMap;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.function.BiFunction;
-import java.util.stream.Collectors;
 
-import org.apache.commons.lang3.function.TriFunction;
 import org.eclipse.microprofile.reactive.messaging.Channel;
-import org.jboss.resteasy.reactive.RestForm;
+import org.jboss.resteasy.reactive.RestStreamElementType;
 
-import cz.amuradon.tralon.agent.Notification;
-import cz.amuradon.tralon.agent.connector.Exchange;
-import cz.amuradon.tralon.agent.connector.RestClient;
-import cz.amuradon.tralon.agent.connector.WebsocketClient;
-import cz.amuradon.tralon.agent.strategies.MomentumScannerStrategy;
-import cz.amuradon.tralon.agent.strategies.Strategy;
-import cz.amuradon.tralon.agent.strategies.StrategyFactory;
-import cz.amuradon.tralon.agent.strategies.marketmaking.MarketMakingStrategy;
-import cz.amuradon.tralon.agent.strategies.marketmaking.SpreadStrategies;
-import cz.amuradon.tralon.agent.strategies.newlisting.ComputeInitialPrice;
-import cz.amuradon.tralon.agent.strategies.newlisting.FixedPercentClosePositionUpdatesProcessor;
-import cz.amuradon.tralon.agent.strategies.newlisting.NewListingStrategy;
-import cz.amuradon.tralon.agent.strategies.newlisting.TrailingProfitStopUpdatesProcessor;
-import cz.amuradon.tralon.agent.strategies.newlisting.UpdatesProcessor;
-import cz.amuradon.tralon.master.web.MainPageResource.Templates;
-import io.quarkus.logging.Log;
+import cz.amuradon.tralon.agent.strategies.scanner.ScannerData;
+import cz.amuradon.tralon.agent.strategies.scanner.ScannerDataItem;
+import cz.amuradon.tralon.agent.strategies.scanner.SymbolAlert;
 import io.quarkus.qute.CheckedTemplate;
 import io.quarkus.qute.TemplateInstance;
-import io.quarkus.runtime.Shutdown;
-import io.smallrye.reactive.messaging.MutinyEmitter;
+import io.smallrye.mutiny.Multi;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.GET;
-import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
@@ -50,8 +23,16 @@ import jakarta.ws.rs.core.MediaType;
 @ApplicationScoped
 public class ScannerResource {
 
+	private final Multi<ScannerData> scannerDataChannel;
+	private final Multi<SymbolAlert> symbolAlertsChannel;
+	private List<ScannerDataItem> items;
+	
 	@Inject
-	public ScannerResource() {
+	public ScannerResource(@Channel(ScannerData.CHANNEL) Multi<ScannerData> scannerDataChannel,
+			@Channel(SymbolAlert.CHANNEL) Multi<SymbolAlert> symbolAlertsChannel) {
+		this.scannerDataChannel = scannerDataChannel;
+		this.symbolAlertsChannel = symbolAlertsChannel;
+		items = new ArrayList<>();
 	}
 	
 	/*
@@ -67,20 +48,40 @@ public class ScannerResource {
 	@GET
 	@Produces(MediaType.TEXT_HTML)
 	public TemplateInstance scanner() {
-		return Templates.scanner();
+		return Templates.scanner(items);
 	}
 
 	@GET
 	@Path("/table")
 	@Produces(MediaType.TEXT_HTML)
 	public TemplateInstance getRunning() {
-		return Templates.table();
+		return Templates.scanner$scannerTable(items);
+	}
+	
+	// FIXME vice scanneru se pere o tabulku, prepisuji si ji
+	@GET
+	@Path("/tableUpdates")
+	@RestStreamElementType(MediaType.TEXT_HTML)
+	public Multi<String> tableUpdates() {
+		return scannerDataChannel.map(d -> {
+			items = d.data();
+			return Templates.scanner$scannerTable(d.data()).render();
+		});
+	}
+
+	// FIXME Asi to neposila jako JSON 
+	// MessageEvent {isTrusted: true, data: 'SymbolAlert[title=New token, body=Some token]', origin: 'http://localhost:9091', lastEventId: '', source: null, …}	
+	@GET
+	@Path("/symbolAlerts")
+	@RestStreamElementType(MediaType.APPLICATION_JSON)
+	public Multi<SymbolAlert> symbolAlerts() {
+		return symbolAlertsChannel;
 	}
 	
 	@CheckedTemplate
 	public static class Templates {
-		public static native TemplateInstance scanner();
-		public static native TemplateInstance table();
+		public static native TemplateInstance scanner(List<ScannerDataItem> items);
+		public static native TemplateInstance scanner$scannerTable(List<ScannerDataItem> items);
 	}
 	
 }

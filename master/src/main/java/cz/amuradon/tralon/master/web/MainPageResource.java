@@ -17,11 +17,9 @@ import org.apache.commons.lang3.function.TriFunction;
 import org.eclipse.microprofile.reactive.messaging.Channel;
 import org.jboss.resteasy.reactive.RestForm;
 
-import cz.amuradon.tralon.agent.Notification;
 import cz.amuradon.tralon.agent.connector.Exchange;
 import cz.amuradon.tralon.agent.connector.RestClient;
 import cz.amuradon.tralon.agent.connector.WebsocketClient;
-import cz.amuradon.tralon.agent.strategies.MomentumScannerStrategy;
 import cz.amuradon.tralon.agent.strategies.Strategy;
 import cz.amuradon.tralon.agent.strategies.StrategyFactory;
 import cz.amuradon.tralon.agent.strategies.marketmaking.MarketMakingStrategy;
@@ -31,6 +29,9 @@ import cz.amuradon.tralon.agent.strategies.newlisting.FixedPercentClosePositionU
 import cz.amuradon.tralon.agent.strategies.newlisting.NewListingStrategy;
 import cz.amuradon.tralon.agent.strategies.newlisting.TrailingProfitStopUpdatesProcessor;
 import cz.amuradon.tralon.agent.strategies.newlisting.UpdatesProcessor;
+import cz.amuradon.tralon.agent.strategies.scanner.MomentumScannerStrategy;
+import cz.amuradon.tralon.agent.strategies.scanner.ScannerData;
+import cz.amuradon.tralon.agent.strategies.scanner.SymbolAlert;
 import io.quarkus.logging.Log;
 import io.quarkus.qute.CheckedTemplate;
 import io.quarkus.qute.TemplateInstance;
@@ -61,7 +62,9 @@ public class MainPageResource {
 	
 	private final ScheduledExecutorService scheduler;
 	
-	private MutinyEmitter<Notification> notificationEmmitter;
+	private final MutinyEmitter<SymbolAlert> symbolAlertsEmmitter;
+	
+	private final MutinyEmitter<ScannerData> scannerDataEmmitter;
 	
 	int counter;
 	
@@ -69,12 +72,14 @@ public class MainPageResource {
 	@Inject
 	public MainPageResource(final StrategyFactory strategyFactory,
 			final ScheduledExecutorService scheduler,
-			@Channel("notifications") final MutinyEmitter<Notification> notificationEmmitter) {
+			@Channel(SymbolAlert.CHANNEL) final MutinyEmitter<SymbolAlert> symbolAlertsEmmitter,
+			@Channel(ScannerData.CHANNEL) final MutinyEmitter<ScannerData> scannerDataEmmitter) {
 		this.strategyFactory = strategyFactory;
 		runningStrategies = new ConcurrentSkipListMap<>();
 		supportedExchanges = Arrays.stream(Exchange.values()).map(Exchange::displayName).collect(Collectors.toList());
 		this.scheduler = scheduler;
-		this.notificationEmmitter = notificationEmmitter;
+		this.symbolAlertsEmmitter = symbolAlertsEmmitter;
+		this.scannerDataEmmitter = scannerDataEmmitter;
 	}
 	
 	@Shutdown
@@ -112,7 +117,7 @@ public class MainPageResource {
 	@POST
 	@Path("/choose-strategy")
 	@Produces(MediaType.TEXT_HTML)
-	public TemplateInstance runSpotHedge(@RestForm String strategy) {
+	public TemplateInstance chooseStrategy(@RestForm String strategy) {
 		Log.infof("Chosen strategy: %s", strategy);
 		if (strategy.equalsIgnoreCase(MOMENTUM_SCANNER)) {
 			return Templates.momentumScanner(supportedExchanges);
@@ -129,10 +134,10 @@ public class MainPageResource {
 	@POST
 	@Path("/run-momentum-scanner")
 	@Produces(MediaType.TEXT_HTML)
-	public TemplateInstance runSpotHedge(@RestForm String exchangeName, @RestForm int priceDelta) {
+	public TemplateInstance runMomentumScanner(@RestForm String exchangeName, @RestForm int priceDelta) {
 		final Exchange exchange = Exchange.fromDisplayName(exchangeName);
 		return runStrategy(exchangeName, "0", "0", false, (r, w, s) ->
-				new MomentumScannerStrategy(exchange, r, scheduler, priceDelta, notificationEmmitter));
+				new MomentumScannerStrategy(exchange, r, scheduler, priceDelta, symbolAlertsEmmitter, scannerDataEmmitter));
 	}
 
 	@POST
@@ -238,7 +243,7 @@ public class MainPageResource {
 	}
 	
 	private String strategyId(String exchange, String baseAsset, String quoteAsset) {
-		return String.join(":", exchange, baseAsset, quoteAsset);
+		return exchange + " - " + baseAsset + "/" + quoteAsset;
 	}
 
 	@CheckedTemplate

@@ -1,23 +1,25 @@
-package cz.amuradon.tralon.agent.strategies;
+package cz.amuradon.tralon.agent.strategies.scanner;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-import cz.amuradon.tralon.agent.Notification;
 import cz.amuradon.tralon.agent.connector.Exchange;
 import cz.amuradon.tralon.agent.connector.RestClient;
 import cz.amuradon.tralon.agent.connector.Ticker;
+import cz.amuradon.tralon.agent.strategies.Strategy;
+import cz.amuradon.tralon.agent.strategies.SymbolValues;
 import io.quarkus.logging.Log;
 import io.smallrye.reactive.messaging.MutinyEmitter;
-import jakarta.inject.Inject;
 
 public class MomentumScannerStrategy implements Strategy {
 
@@ -26,18 +28,20 @@ public class MomentumScannerStrategy implements Strategy {
 	private final ScheduledExecutorService scheduler;
 	private final int priceDelta;
 	private final Map<String, LinkedList<SymbolValues>> movingValues;
-	private final MutinyEmitter<Notification> notificationEmmitter;
-	private final Set<String> reported; 
+	private final MutinyEmitter<SymbolAlert> symbolAlertsEmmitter;
+	private final MutinyEmitter<ScannerData> scannerDataEmitter;
+	private final Set<String> reported;
 	private ScheduledFuture<?> task;
 	
 	public MomentumScannerStrategy(Exchange exchange, RestClient restClient, final ScheduledExecutorService scheduler,
-			int priceDelta, MutinyEmitter<Notification> notificationEmmitter) {
+			int priceDelta, MutinyEmitter<SymbolAlert> symbolAlertsEmmitter, MutinyEmitter<ScannerData> scannerDataEmitter) {
 		this.exchange = exchange;
 		this.restClient = restClient;
 		this.scheduler = scheduler;
 		this.priceDelta = priceDelta;
 		this.movingValues = new HashMap<>();
-		this.notificationEmmitter = notificationEmmitter;
+		this.symbolAlertsEmmitter = symbolAlertsEmmitter;
+		this.scannerDataEmitter = scannerDataEmitter;
 		reported = new HashSet<>();
 	}
 
@@ -64,6 +68,7 @@ public class MomentumScannerStrategy implements Strategy {
 	void scan() {
 		Ticker[] tickers = restClient.ticker();
 		Set<String> reportingThisCycle = new HashSet<>();
+		List<ScannerDataItem> items = new ArrayList<>();
 		for (Ticker ticker : tickers) {
 			if (filter(ticker)) {
 				String symbol = ticker.symbol();
@@ -84,23 +89,28 @@ public class MomentumScannerStrategy implements Strategy {
 					BigDecimal m5VolumeChange = getPercentage(quoteVolume, m5.quoteVolume());
 					BigDecimal m15VolumeChange = getPercentage(quoteVolume, m15.quoteVolume());
 					reportingThisCycle.add(symbol);
-					Log.infof("%s Symbol %s, 1p: %s, 5p: %s, 15p: %s, 1v: %s, 5v: %s, 15v: %s", exchange.displayName(),
-							symbol,
+					items.add(new ScannerDataItem(symbol, exchange.displayName(),
+							String.format("1p: %s, 5p: %s, 15p: %s, 1v: %s, 5v: %s, 15v: %s",
 							m1PriceChange, m5PriceChange, m15PriceChange, m1VolumeChange, m5VolumeChange,
-							m15VolumeChange);
+							m15VolumeChange)));
 					
 					if (!reported.contains(symbol)) {
 						Log.infof("Notifying %s %s", exchange.displayName(), symbol);
-						notificationEmmitter.sendAndForget(new Notification("New Momentum symbol",
-								String.format("%s Symbol %s, 1p: %s, 5p: %s, 15p: %s, 1v: %s, 5v: %s, 15v: %s", exchange.displayName(),
-								symbol,
-								m1PriceChange, m5PriceChange, m15PriceChange, m1VolumeChange, m5VolumeChange,
-								m15VolumeChange)));
+						if (symbolAlertsEmmitter.hasRequests()) {
+							symbolAlertsEmmitter.sendAndForget(new SymbolAlert(symbol, exchange.displayName(),
+									String.format("%s Symbol %s, 1p: %s, 5p: %s, 15p: %s, 1v: %s, 5v: %s, 15v: %s", exchange.displayName(),
+									symbol,
+									m1PriceChange, m5PriceChange, m15PriceChange, m1VolumeChange, m5VolumeChange,
+									m15VolumeChange)));
+						}
 					}
 				}
 				values.removeFirst();
 				values.addLast(new SymbolValues(ticker.lastPrice(), ticker.quoteVolume()));
 			}
+		}
+		if (scannerDataEmitter.hasRequests()) {
+			scannerDataEmitter.sendAndForget(new ScannerData(exchange.displayName(), items));
 		}
 		reported.clear();
 		reported.addAll(reportingThisCycle);

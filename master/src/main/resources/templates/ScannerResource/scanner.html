@@ -1,4 +1,4 @@
-{@java.lang.String[] strategies}
+{@java.util.List<cz.amuradon.tralon.agent.strategies.scanner.ScannerDataItem> items}
 
 <!DOCTYPE html>
 <html>
@@ -11,16 +11,40 @@
 </head>
 <body>
 <h1>Tralon: Scanner</h1>
-<div hx-ext="sse" sse-connect="/notifications" sse-swap="message">
-  <div hx-get="/scanner/table" hx-trigger="sse:message"></div>
+<!-- FIXME Rozdelit tabulku podle burz -->
+<div id="scannerData" hx-ext="sse" sse-connect="/scanner/tableUpdates" sse-swap="message">
+<!-- TODO link primo na exchange a symbol k tradovani -->
+  {#fragment scannerTable}
+  <table>
+  <thead>
+  <tr>
+    <th>Symbol</th>
+    <th>Exchange</th>
+    <th>Data</th>
+  </tr>
+  </thead>
+  {#for item in items}
+    <tr>
+	    <td>{item.symbol}</td>
+	    <td>{item.exchange}</td>
+	    <td>{item.data}</td>
+    </tr>
+  {/for}
+  </table>
+  {/fragment}
 </div>
+<div id="symbolAlerts" hx-ext="sse" sse-connect="/scanner/symbolAlerts" sse-swap="message"></div>
   <script type="text/javascript">
+    // FIXME prehrati zvuku a notifikaci chci na /notifications
   	window.onload = () => {
   		var alert = new Audio("light-hearted-message-tone.ogg");
   		document.body.addEventListener('htmx:sseMessage', function (e) {
-		 	alert.play();
-  			if (Notification.permission === 'granted') {
-  		  		new Notification(e.detail.data, { body: e.detail.data });
+			console.log(e);
+  			if (e.detail.elt.id === 'symbolAlerts') {
+		 	  alert.play();
+  			  if (Notification.permission === 'granted') {
+  		  		  new Notification(e.detail.data, { body: e.detail.data });
+  			  }
   			}
   		});
   		
