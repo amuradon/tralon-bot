@@ -1,4 +1,5 @@
-{@java.util.List<cz.amuradon.tralon.agent.strategies.scanner.ScannerDataItem> items}
+{@java.util.List<String> exchanges}
+{@java.util.Map<String, java.util.List<cz.amuradon.tralon.agent.strategies.scanner.ScannerDataItem>> data}
 
 <!DOCTYPE html>
 <html>
@@ -11,36 +12,43 @@
 </head>
 <body>
 <h1>Tralon: Scanner</h1>
-<!-- FIXME Rozdelit tabulku podle burz -->
-<div id="scannerData" hx-ext="sse" sse-connect="/scanner/tableUpdates" sse-swap="message">
+<div id="scannerData" hx-ext="sse" sse-connect="/scanner/tableUpdates">
 <!-- TODO link primo na exchange a symbol k tradovani -->
-  {#fragment scannerTable}
-  <table>
-  <thead>
-  <tr>
-    <th>Symbol</th>
-    <th>Exchange</th>
-    <th>Data</th>
-  </tr>
-  </thead>
-  {#for item in items}
+  {#for name in exchanges}
+  <div sse-swap="{name}">
+    {#let list=data.get(name)}
+    {#if list}
+    {#fragment exchangeTable}
+    <table>
+    <thead>
     <tr>
+      <th>Symbol</th>
+      <th>Exchange</th>
+      <th>Data</th>
+    </tr>
+    </thead>
+      {#for item in list}
+      <tr>
 	    <td>{item.symbol}</td>
 	    <td>{item.exchange}</td>
 	    <td>{item.data}</td>
-    </tr>
+      </tr>
+      {/for}
+    </table>
+    {/fragment}
+    {/if}
+  </div>
+<!-- FIXME zobrazit vsechny soucasne alerty, zobrazuje se jen posledni -->
+  <!-- TODO zobrazit cas notifikace -->
+  <div id="symbolAlerts" hx-ext="sse" sse-connect="/scanner/symbolAlerts" sse-swap="{name}"></div>
   {/for}
-  </table>
-  {/fragment}
 </div>
-<div id="symbolAlerts" hx-ext="sse" sse-connect="/scanner/symbolAlerts" sse-swap="message"></div>
   <script type="text/javascript">
-    // FIXME prehrati zvuku a notifikaci chci na /notifications
   	window.onload = () => {
   		var alert = new Audio("light-hearted-message-tone.ogg");
   		document.body.addEventListener('htmx:sseMessage', function (e) {
 			console.log(e);
-  			if (e.detail.elt.id === 'symbolAlerts') {
+  			if (e.target.id === 'symbolAlerts') {
 		 	  alert.play();
   			  if (Notification.permission === 'granted') {
   		  		  new Notification(e.detail.data, { body: e.detail.data });
