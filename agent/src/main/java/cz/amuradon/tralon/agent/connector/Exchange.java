@@ -10,7 +10,7 @@ import cz.amuradon.tralon.agent.connector.mexc.Mexc;
 
 public enum Exchange {
 
-	BINANCE("Binance", Binance.LITERAL),
+	BINANCE("Binance", Binance.LITERAL, "USDC"),  // USDT is blocked for EU
 	BINANCE_ALPHA("Binance Alpha", BinanceAlpha.LITERAL) {
 		@Override
 		public boolean momentumTokenfilter(Ticker ticker) {
@@ -32,10 +32,16 @@ public enum Exchange {
 	
 	private final String displayName;
 	private final Annotation qualifier;
+	private final String quoteToken;
 	
 	private Exchange(final String displayName, final Annotation qualifier) {
+		this(displayName, qualifier, "USDT");
+	}
+
+	private Exchange(final String displayName, final Annotation qualifier, final String quoteToken) {
 		this.displayName = displayName;
 		this.qualifier = qualifier;
+		this.quoteToken = quoteToken;
 	}
 
 	public String displayName() {
@@ -64,6 +70,6 @@ public enum Exchange {
 	}
 	
 	public boolean momentumTokenfilter(Ticker ticker) {
-		return ticker.symbol().endsWith("USDT");
+		return ticker.symbol().endsWith(quoteToken);
 	}
 }
