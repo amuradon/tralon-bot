@@ -1,4 +1,4 @@
-package cz.amuradon.tralon.agent.connector.binancealpha;
+package cz.amuradon.tralon.agent.connector.binance.alpha;
 
 import java.util.List;
 import java.util.Map;
@@ -64,7 +64,7 @@ public class BinanceAlphaRestClient implements RestClient {
 
 	@Override
 	public Ticker[] ticker() {
-		return client.ticker().data()   ;
+		return client.ticker().data();
 	}
 
 	@Override

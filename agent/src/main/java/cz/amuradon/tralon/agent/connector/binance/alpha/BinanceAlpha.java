@@ -1,4 +1,4 @@
-package cz.amuradon.tralon.agent.connector.binancealpha;
+package cz.amuradon.tralon.agent.connector.binance.alpha;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;

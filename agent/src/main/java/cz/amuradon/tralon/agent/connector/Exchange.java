@@ -3,8 +3,9 @@ package cz.amuradon.tralon.agent.connector;
 import java.lang.annotation.Annotation;
 
 import cz.amuradon.tralon.agent.connector.binance.Binance;
-import cz.amuradon.tralon.agent.connector.binancealpha.BinanceAlpha;
-import cz.amuradon.tralon.agent.connector.binancealpha.BinanceAlphaTicker;
+import cz.amuradon.tralon.agent.connector.binance.alpha.BinanceAlpha;
+import cz.amuradon.tralon.agent.connector.binance.alpha.BinanceAlphaTicker;
+import cz.amuradon.tralon.agent.connector.binance.futures.BinanceFutures;
 import cz.amuradon.tralon.agent.connector.kucoin.Kucoin;
 import cz.amuradon.tralon.agent.connector.mexc.Mexc;
 
@@ -17,6 +18,7 @@ public enum Exchange {
 			return !((BinanceAlphaTicker) ticker).listingCex(); 
 		}
 	},
+	BINANCE_FUTURES("Binance Futures", BinanceFutures.LITERAL),  // For Futures USDT is allowed in EU
 	KUCOIN("Kucoin", Kucoin.LITERAL) {
 		@Override
 		public String symbol(String baseAsset, String quoteAsset) {
