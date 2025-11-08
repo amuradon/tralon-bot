@@ -39,4 +39,14 @@ public class KucoinTicker implements Ticker {
 		return ticker.getVol();
 	}
 
+	@Override
+	public BigDecimal priceChangePercent() {
+		return ticker.getChangeRate().multiply(new BigDecimal(100));
+	}
+
+	@Override
+	public BigDecimal weightedAvgPrice() {
+		return ticker.getAveragePrice();  // not clear if it's weighted
+	}
+
 }

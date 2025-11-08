@@ -90,7 +90,8 @@ public class MomentumScannerStrategy implements Strategy {
 					BigDecimal m15VolumeChange = getPercentage(quoteVolume, m15.quoteVolume());
 					reportingThisCycle.add(symbol);
 					items.add(new ScannerDataItem(symbol, exchange.displayName(),
-							String.format("1p: %s, 5p: %s, 15p: %s, 1v: %s, 5v: %s, 15v: %s",
+							String.format("24h: %s, w: %s, 1p: %s, 5p: %s, 15p: %s, 1v: %s, 5v: %s, 15v: %s",
+							ticker.priceChangePercent(), getPercentage(ticker.lastPrice(), ticker.weightedAvgPrice()),
 							m1PriceChange, m5PriceChange, m15PriceChange, m1VolumeChange, m5VolumeChange,
 							m15VolumeChange)));
 					

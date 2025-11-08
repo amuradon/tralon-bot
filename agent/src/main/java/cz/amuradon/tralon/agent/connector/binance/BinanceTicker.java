@@ -11,10 +11,13 @@ public record BinanceTicker(String symbol,
 		long closeTime,
 		BigDecimal lastPrice,
 		BigDecimal quoteVolume,
-		BigDecimal volume) implements Ticker {
+		BigDecimal volume,
+		BigDecimal priceChangePercent,
+		BigDecimal weightedAvgPrice) implements Ticker {
 	
 	@Override
 	public String toString() {
-		return String.format("BinanceTicker(%s, %d, %s, %s, %s)", symbol, closeTime, lastPrice, quoteVolume, volume);
+		return String.format("BinanceTicker(%s, %d, %s, %s, %s, %s, %s)", symbol, closeTime, lastPrice, quoteVolume,
+				volume, priceChangePercent, weightedAvgPrice);
 	}
 }

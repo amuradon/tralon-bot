@@ -11,10 +11,16 @@ public record MexcTicker(String symbol,
 		long closeTime,
 		BigDecimal lastPrice,
 		BigDecimal quoteVolume,
-		BigDecimal volume) implements Ticker {
+		BigDecimal volume,
+		BigDecimal priceChangePercent) implements Ticker {
 	
 	@Override
 	public String toString() {
 		return String.format("MexcTicker(%s, %d, %s, %s, %s)", symbol, closeTime, lastPrice, quoteVolume, volume);
+	}
+
+	@Override
+	public BigDecimal weightedAvgPrice() {
+		return lastPrice;  // FIXME nevypada, ze by v payloadu bylo
 	}
 }

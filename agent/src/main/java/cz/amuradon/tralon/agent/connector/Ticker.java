@@ -7,5 +7,7 @@ public interface Ticker {
 	String symbol();
 	BigDecimal lastPrice();
 	BigDecimal quoteVolume();
+	BigDecimal priceChangePercent();
+	BigDecimal weightedAvgPrice();
 	
 }
