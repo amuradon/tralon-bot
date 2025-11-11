@@ -3,10 +3,13 @@
  */
 
 window.onload = () => {
-  		var alert = new Audio("scannernotification.ogg");
+  		var alert = document.getElementById('notificationsound');
+		
   		document.body.addEventListener('htmx:sseMessage', function (e) {
   			if (e.target.classList.contains('symbolAlerts')) {
 
+				// FIXME stale to nehraje spolehlive
+				alert.currentTime = 0;
 				alert.play();
 				
 		 		var notificationsElt = document.getElementById("notifications");
