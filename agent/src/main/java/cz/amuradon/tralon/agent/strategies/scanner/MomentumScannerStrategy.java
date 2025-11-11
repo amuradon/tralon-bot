@@ -2,13 +2,13 @@ package cz.amuradon.tralon.agent.strategies.scanner;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -27,22 +27,25 @@ public class MomentumScannerStrategy implements Strategy {
 	private final RestClient restClient;
 	private final ScheduledExecutorService scheduler;
 	private final int priceDelta;
+	private final int usdVolume24h;
 	private final Map<String, LinkedList<SymbolValues>> movingValues;
 	private final MutinyEmitter<SymbolAlert> symbolAlertsEmmitter;
 	private final MutinyEmitter<ScannerData> scannerDataEmitter;
-	private final Set<String> reported;
+	private final Map<String, String> reported;
 	private ScheduledFuture<?> task;
 	
 	public MomentumScannerStrategy(Exchange exchange, RestClient restClient, final ScheduledExecutorService scheduler,
-			int priceDelta, MutinyEmitter<SymbolAlert> symbolAlertsEmmitter, MutinyEmitter<ScannerData> scannerDataEmitter) {
+			int priceDelta, int usdVolume24h,
+			MutinyEmitter<SymbolAlert> symbolAlertsEmmitter, MutinyEmitter<ScannerData> scannerDataEmitter) {
 		this.exchange = exchange;
 		this.restClient = restClient;
 		this.scheduler = scheduler;
 		this.priceDelta = priceDelta;
+		this.usdVolume24h = usdVolume24h;
 		this.movingValues = new HashMap<>();
 		this.symbolAlertsEmmitter = symbolAlertsEmmitter;
 		this.scannerDataEmitter = scannerDataEmitter;
-		reported = new HashSet<>();
+		reported = new HashMap<>();
 	}
 
 	@Override
@@ -67,8 +70,9 @@ public class MomentumScannerStrategy implements Strategy {
 	
 	void scan() {
 		Ticker[] tickers = restClient.ticker();
-		Set<String> reportingThisCycle = new HashSet<>();
+		Map<String, String> reportingThisCycle = new HashMap<>();
 		List<ScannerDataItem> items = new ArrayList<>();
+		String currentCycleTimestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
 		for (Ticker ticker : tickers) {
 			if (filter(ticker)) {
 				String symbol = ticker.symbol();
@@ -88,21 +92,26 @@ public class MomentumScannerStrategy implements Strategy {
 					BigDecimal m1VolumeChange = getPercentage(quoteVolume, m1.quoteVolume());
 					BigDecimal m5VolumeChange = getPercentage(quoteVolume, m5.quoteVolume());
 					BigDecimal m15VolumeChange = getPercentage(quoteVolume, m15.quoteVolume());
-					reportingThisCycle.add(symbol);
+					String timestamp = currentCycleTimestamp;
+					boolean isNew = true;
+					String previouslyReported = reported.get(symbol);
+					if (previouslyReported != null) {
+						timestamp = previouslyReported;
+						isNew = false;
+					}
+					reportingThisCycle.put(symbol, timestamp);
 					items.add(new ScannerDataItem(symbol, exchange.displayName(),
+							exchange.terminalUrl(ticker), timestamp, isNew,
 							String.format("24h: %s, w: %s, 1p: %s, 5p: %s, 15p: %s, 1v: %s, 5v: %s, 15v: %s",
 							ticker.priceChangePercent(), getPercentage(ticker.lastPrice(), ticker.weightedAvgPrice()),
 							m1PriceChange, m5PriceChange, m15PriceChange, m1VolumeChange, m5VolumeChange,
 							m15VolumeChange)));
 					
-					if (!reported.contains(symbol)) {
+					if (!reported.containsKey(symbol)) {
 						Log.infof("Notifying %s %s", exchange.displayName(), symbol);
 						if (symbolAlertsEmmitter.hasRequests()) {
 							symbolAlertsEmmitter.sendAndForget(new SymbolAlert(symbol, exchange.displayName(),
-									String.format("%s Symbol %s, 1p: %s, 5p: %s, 15p: %s, 1v: %s, 5v: %s, 15v: %s", exchange.displayName(),
-									symbol,
-									m1PriceChange, m5PriceChange, m15PriceChange, m1VolumeChange, m5VolumeChange,
-									m15VolumeChange)));
+									timestamp));
 						}
 					}
 				}
@@ -114,7 +123,7 @@ public class MomentumScannerStrategy implements Strategy {
 			scannerDataEmitter.sendAndForget(new ScannerData(exchange.displayName(), items));
 		}
 		reported.clear();
-		reported.addAll(reportingThisCycle);
+		reported.putAll(reportingThisCycle);
 	}
 
 	private BigDecimal getPercentage(BigDecimal current, BigDecimal previous) {
@@ -130,7 +139,8 @@ public class MomentumScannerStrategy implements Strategy {
 	}
 	
 	private boolean filter(Ticker ticker) {
-		return exchange.momentumTokenfilter(ticker) && ticker.quoteVolume().compareTo(BigDecimal.valueOf(1000000)) == 1;
+		return exchange.momentumTokenfilter(ticker) 
+				&& ticker.quoteVolume().compareTo(BigDecimal.valueOf(usdVolume24h)) == 1;
 	}
 
 	@Override

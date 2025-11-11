@@ -6,14 +6,17 @@
 <head>
   <meta charset="UTF-8">
   <title>Tralon: Scanner</title>
-  <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css">
+
   <script src="https://unpkg.com/htmx.org@2.0.7"></script>
   <script src="https://unpkg.com/htmx-ext-sse@2.2.4"></script>
+  <script src="scanner.js"></script>
+  
+  <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css" />
+  <link rel="stylesheet" href="tralon.css" />
 </head>
 <body>
 <h1>Tralon: Scanner</h1>
 <div id="scannerData" hx-ext="sse" sse-connect="/scanner/tableUpdates">
-<!-- TODO link primo na exchange a symbol k tradovani -->
   {#for name in exchanges}
   <div sse-swap="{name}">
     {#let list=data.get(name)}
@@ -24,13 +27,15 @@
     <tr>
       <th>Symbol</th>
       <th>Exchange</th>
+      <th>Timestamp</th>
       <th>Data</th>
     </tr>
     </thead>
       {#for item in list}
-      <tr>
-	    <td>{item.symbol}</td>
+      <tr class="{item.isNew ? 'new-symbol' : ''}">
+	    <td><a href="{item.link}" target="_blank">{item.symbol}</a></td>
 	    <td>{item.exchange}</td>
+	    <td>{item.timestamp}</td>
 	    <td>{item.data}</td>
       </tr>
       {/for}
@@ -38,25 +43,9 @@
     {/fragment}
     {/if}
   </div>
-<!-- FIXME zobrazit vsechny soucasne alerty, zobrazuje se jen posledni -->
-  <!-- TODO zobrazit cas notifikace -->
-  <div id="symbolAlerts" hx-ext="sse" sse-connect="/scanner/symbolAlerts" sse-swap="{name}"></div>
+  <div class="symbolAlerts" hx-ext="sse" sse-connect="/scanner/symbolAlerts" sse-swap="{name}" hx-swap="none"></div>
   {/for}
+  <div id="notifications" class="notifications"></div>
 </div>
-  <script type="text/javascript">
-  	window.onload = () => {
-  		var alert = new Audio("light-hearted-message-tone.ogg");
-  		document.body.addEventListener('htmx:sseMessage', function (e) {
-			console.log(e);
-  			if (e.target.id === 'symbolAlerts') {
-		 	  alert.play();
-  			  if (Notification.permission === 'granted') {
-  		  		  new Notification(e.detail.data, { body: e.detail.data });
-  			  }
-  			}
-  		});
-  		
-  	};
-  </script>
 </body>
 </html>

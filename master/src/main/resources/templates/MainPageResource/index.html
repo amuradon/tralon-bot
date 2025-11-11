@@ -3,30 +3,41 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>Tralon</title>
-  <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css">
-  <script src="https://unpkg.com/htmx.org@2.0.7"></script>
-  <script src="https://unpkg.com/htmx-ext-response-targets@2.0.4"></script>
-  <script src="https://unpkg.com/htmx-ext-sse@2.2.4"></script>
+	<meta charset="UTF-8">
+	<title>Tralon</title>
+	<script src="https://unpkg.com/htmx.org@2.0.7"></script>
+	<script src="https://unpkg.com/htmx-ext-response-targets@2.0.4"></script>
+	<script src="https://unpkg.com/htmx-ext-sse@2.2.4"></script>
+
+	<link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css" />
+	<link rel="stylesheet" href="tralon.css" />
 </head>
-<body hx-ext="response-targets">
-<h1>Tralon</h1>
-<h4>Running strategies</h4>
-<div id="runningStrategies" hx-get="/get-running" hx-trigger="load">
-<!-- To be replaced by the result of call on load -->
-</div>
-<h4>Run new strategy</h4>
-<label for="strategy">Choose Strategy:</label>
-<select name="strategy" id="strategy" hx-post="/choose-strategy" hx-target="#strategyConfig" hx-include="this">
-	<option value="none" selected="true">--None--</option>
-  {#for name in strategies}
-	<option value="{name}">{name}</option>
-  {/for}
-</select>
-<div id="strategyConfig" hx-post="/choose-strategy" hx-trigger="load" hx-include="#strategy">
-<!-- To be replaced by the result of call on load -->
-</div>
-<div id="errors"></div>
+<body class="grid" hx-ext="response-targets">
+	<h1>Tralon</h1>
+	<div class="row">
+		<div class="column">
+			<h4>Run new strategy</h4>
+			<label for="strategy">Choose Strategy:</label>
+			<select name="strategy"
+					id="strategy" hx-post="/choose-strategy" hx-target="#strategyConfig"
+					hx-include="this">
+				<option value="none" selected="true">--None--</option>
+				{#for name in strategies}
+				<option value="{name}">{name}</option>
+				{/for}
+			</select>
+			<div id="strategyConfig" hx-post="/choose-strategy" hx-trigger="load"
+				hx-include="#strategy">
+				<!-- To be replaced by the result of call on load -->
+			</div>
+		</div>
+		<div class="column">
+			<h4>Running strategies</h4>
+			<div id="runningStrategies" hx-get="/get-running" hx-trigger="load">
+				<!-- To be replaced by the result of call on load -->
+			</div>
+			<div id="errors"></div>
+		</div>
+	</div>
 </body>
 </html>

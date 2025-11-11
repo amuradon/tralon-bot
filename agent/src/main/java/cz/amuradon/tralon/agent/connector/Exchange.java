@@ -2,6 +2,8 @@ package cz.amuradon.tralon.agent.connector;
 
 import java.lang.annotation.Annotation;
 
+import org.eclipse.microprofile.config.ConfigProvider;
+
 import cz.amuradon.tralon.agent.connector.binance.Binance;
 import cz.amuradon.tralon.agent.connector.binance.alpha.BinanceAlpha;
 import cz.amuradon.tralon.agent.connector.binance.alpha.BinanceAlphaTicker;
@@ -16,6 +18,12 @@ public enum Exchange {
 		@Override
 		public boolean momentumTokenfilter(Ticker ticker) {
 			return !((BinanceAlphaTicker) ticker).listingCex(); 
+		}
+		
+		@Override
+		String terminalUrlPath(Ticker ticker) {
+			BinanceAlphaTicker casted = (BinanceAlphaTicker) ticker;
+			return casted.chainName().toLowerCase() + "/" + casted.contractAddress();
 		}
 	},
 	BINANCE_FUTURES("Binance Futures", BinanceFutures.LITERAL),  // For Futures USDT is allowed in EU
@@ -73,5 +81,15 @@ public enum Exchange {
 	
 	public boolean momentumTokenfilter(Ticker ticker) {
 		return ticker.symbol().endsWith(quoteToken);
+	}
+
+	public String terminalUrl(Ticker ticker) {
+		return String.format("%s/%s",
+				ConfigProvider.getConfig().getValue("exchanges." + name().toLowerCase() + ".baseUrl", String.class),
+				terminalUrlPath(ticker));
+	}
+	
+	String terminalUrlPath(Ticker ticker) {
+		return ticker.symbol();
 	}
 }

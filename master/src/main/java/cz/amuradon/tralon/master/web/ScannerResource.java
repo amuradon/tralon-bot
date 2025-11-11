@@ -66,11 +66,9 @@ public class ScannerResource {
 		});
 	}
 
-	// FIXME Asi to neposila jako JSON 
-	// MessageEvent {isTrusted: true, data: 'SymbolAlert[title=New token, body=Some token]', origin: 'http://localhost:9091', lastEventId: '', source: null, …}	
 	@GET
 	@Path("/symbolAlerts")
-	@RestStreamElementType(MediaType.APPLICATION_JSON)
+	@RestStreamElementType(MediaType.TEXT_PLAIN)
 	public Multi<OutboundSseEvent> symbolAlerts() {
 		return symbolAlertsChannel.map(d -> sse.newEventBuilder().name(d.exchange()).data(d).build());
 	}
