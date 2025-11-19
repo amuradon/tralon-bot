@@ -1,5 +1,6 @@
 {@String symbol}
 {@String exchange}
+{@java.util.List<cz.amuradon.tralon.master.web.Trade> trades}
 
 <!DOCTYPE html>
 <html>
@@ -15,8 +16,36 @@
 </head>
 <body>
 	<div>
-		<button>Buy 100 USD</button>
-		<button>Sell all</button>
+		<button hx-target="#trades" hx-post="/terminal/buy/{exchange}/{symbol}" hx-swap="outerHTML">Buy 100 USD</button>
+		<button hx-target="#trades" hx-post="/terminal/sellAll/{exchange}/{symbol}" hx-swap="outerHTML">Sell all</button>
 	</div>
+	{#fragment trades}
+	<table id="trades">
+		<thead>
+			<tr>
+				<th>Timestamp</th>
+				<th>Exchange</th>
+				<th>Symbol</th>
+				<th>Side</th>
+				<th>Avg Price</th>
+				<th>Quantity</th>
+				<th>Total USD</th>
+				<th>Commission</th>
+			</tr>
+		</thead>
+		{#for item in trades}
+		<tr>
+			<td>{item.timestamp}</td>
+			<td>{item.exchange}</td>
+			<td>{item.symbol}</td>
+			<td>{item.side}</td>
+			<td>{item.avgPrice}</td>
+			<td>{item.quantity}</td>
+			<td>{item.quoteQuantity}</td>
+			<td>{item.commission}</td>
+		</tr>
+		{/for}
+	</table>
+	{/fragment}
 </body>
 </html>
