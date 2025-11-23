@@ -8,6 +8,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.NotImplementedException;
+
 import com.kucoin.sdk.rest.request.OrderCreateApiRequest;
 import com.kucoin.sdk.rest.request.OrderCreateApiRequest.OrderCreateApiRequestBuilder;
 import com.kucoin.sdk.rest.response.AllTickersResponse;
@@ -16,6 +18,7 @@ import com.kucoin.sdk.rest.response.SymbolResponse;
 import cz.amuradon.tralon.agent.OrderType;
 import cz.amuradon.tralon.agent.Side;
 import cz.amuradon.tralon.agent.connector.AccountBalance;
+import cz.amuradon.tralon.agent.connector.Kline;
 import cz.amuradon.tralon.agent.connector.OrderBookResponse;
 import cz.amuradon.tralon.agent.connector.OrderBookResponseImpl;
 import cz.amuradon.tralon.agent.connector.RestClient;
@@ -124,6 +127,11 @@ public class KucoinRestClient implements RestClient {
 		} catch (IOException e) {
 			throw new IllegalStateException("Could not get 24h ticker.", e);
 		}
+	}
+	
+	@Override
+	public Kline[] klines(String symbol, String interval, int limit) {
+		throw new NotImplementedException("It seems Kucoin Java SDK does not support it.");
 	}
 	
 	@Override

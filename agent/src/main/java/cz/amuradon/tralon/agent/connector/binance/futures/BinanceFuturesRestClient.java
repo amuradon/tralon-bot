@@ -6,6 +6,7 @@ import java.util.Map;
 import org.apache.commons.lang3.NotImplementedException;
 
 import cz.amuradon.tralon.agent.connector.AccountBalance;
+import cz.amuradon.tralon.agent.connector.Kline;
 import cz.amuradon.tralon.agent.connector.OrderBookResponse;
 import cz.amuradon.tralon.agent.connector.RestClient;
 import cz.amuradon.tralon.agent.connector.RestClientFactory;
@@ -65,6 +66,11 @@ public class BinanceFuturesRestClient implements RestClient {
 	@Override
 	public Ticker[] ticker() {
 		return client.ticker();
+	}
+	
+	@Override
+	public Kline[] klines(String symbol, String interval, int limit) {
+		return client.klines(symbol, interval, limit);
 	}
 
 	@Override

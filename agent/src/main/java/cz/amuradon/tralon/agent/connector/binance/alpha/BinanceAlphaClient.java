@@ -3,7 +3,9 @@ package cz.amuradon.tralon.agent.connector.binance.alpha;
 import org.eclipse.microprofile.faulttolerance.Retry;
 import org.eclipse.microprofile.rest.client.annotation.ClientHeaderParam;
 import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
+import org.jboss.resteasy.reactive.RestQuery;
 
+import cz.amuradon.tralon.agent.connector.Kline;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 
@@ -17,4 +19,7 @@ public interface BinanceAlphaClient {
 	@GET
 	TokenList ticker();
 
+	@Path("/alpha-trade/klines")
+	@GET
+	Kline[] klines(@RestQuery String symbol, @RestQuery String interval, @RestQuery int limit);
 }

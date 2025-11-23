@@ -27,6 +27,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.amuradon.tralon.agent.OrderType;
 import cz.amuradon.tralon.agent.Side;
 import cz.amuradon.tralon.agent.connector.AccountBalance;
+import cz.amuradon.tralon.agent.connector.Kline;
 import cz.amuradon.tralon.agent.connector.NoopRestClientListener;
 import cz.amuradon.tralon.agent.connector.OrderBookResponse;
 import cz.amuradon.tralon.agent.connector.OrderBookResponseImpl;
@@ -161,6 +162,11 @@ public class MexcRestClientAdapter implements RestClient {
 	@Override
 	public Ticker[] ticker() {
 		return mexcClient.ticker();
+	}
+	
+	@Override
+	public Kline[] klines(String symbol, String interval, int limit) {
+		return mexcClient.klines(symbol, interval, limit);
 	}
 	
 	@Override

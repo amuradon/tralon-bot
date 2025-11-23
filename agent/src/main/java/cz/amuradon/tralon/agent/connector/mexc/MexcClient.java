@@ -11,6 +11,7 @@ import org.eclipse.microprofile.rest.client.annotation.ClientHeaderParam;
 import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
 import org.jboss.resteasy.reactive.RestQuery;
 
+import cz.amuradon.tralon.agent.connector.Kline;
 import cz.amuradon.tralon.agent.connector.ListenKey;
 import cz.amuradon.tralon.agent.connector.NoValidTradePriceException;
 import cz.amuradon.tralon.agent.connector.RequestException;
@@ -42,6 +43,10 @@ public interface MexcClient {
 	@Path("/ticker/24hr")
 	@GET
 	MexcTicker[] ticker();
+	
+	@Path("/klines")
+	@GET
+	Kline[] klines(@RestQuery String symbol, @RestQuery String interval, @RestQuery int limit);
 
 	@Path("/depth")
 	@GET

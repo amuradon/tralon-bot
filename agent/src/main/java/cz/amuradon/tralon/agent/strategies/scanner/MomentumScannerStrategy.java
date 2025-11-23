@@ -14,6 +14,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import cz.amuradon.tralon.agent.connector.Exchange;
+import cz.amuradon.tralon.agent.connector.Kline;
 import cz.amuradon.tralon.agent.connector.RestClient;
 import cz.amuradon.tralon.agent.connector.Ticker;
 import cz.amuradon.tralon.agent.strategies.Strategy;
@@ -83,15 +84,13 @@ public class MomentumScannerStrategy implements Strategy {
 				
 				// Spocitat % rozdilu pro cenu a volume
 				BigDecimal lastPrice = ticker.lastPrice();
-				BigDecimal quoteVolume = ticker.quoteVolume();
 				
 				BigDecimal m1PriceChange = getPercentage(lastPrice, m1.lastPrice());
 				BigDecimal m5PriceChange = getPercentage(lastPrice, m5.lastPrice());
 				BigDecimal m15PriceChange = getPercentage(lastPrice, m15.lastPrice());
 				if (aboveThreshold(m1PriceChange) || aboveThreshold(m5PriceChange)) {
-					BigDecimal m1VolumeChange = getPercentage(quoteVolume, m1.quoteVolume());
-					BigDecimal m5VolumeChange = getPercentage(quoteVolume, m5.quoteVolume());
-					BigDecimal m15VolumeChange = getPercentage(quoteVolume, m15.quoteVolume());
+					String volumeDiffs = calculatedVolumeDiffs(symbol);
+					
 					String timestamp = currentCycleTimestamp;
 					boolean isNew = true;
 					String previouslyReported = reported.get(symbol);
@@ -102,10 +101,9 @@ public class MomentumScannerStrategy implements Strategy {
 					reportingThisCycle.put(symbol, timestamp);
 					items.add(new ScannerDataItem(symbol, exchange.displayName(),
 							exchange.terminalUrl(ticker), timestamp, isNew,
-							String.format("24h: %s, w: %s, 1p: %s, 5p: %s, 15p: %s, 1v: %s, 5v: %s, 15v: %s",
+							String.format("24h: %s, w: %s, 1p: %s, 5p: %s, 15p: %s, %s",
 							ticker.priceChangePercent(), getPercentage(ticker.lastPrice(), ticker.weightedAvgPrice()),
-							m1PriceChange, m5PriceChange, m15PriceChange, m1VolumeChange, m5VolumeChange,
-							m15VolumeChange)));
+							m1PriceChange, m5PriceChange, m15PriceChange, volumeDiffs)));
 					
 					if (!reported.containsKey(symbol)) {
 						Log.infof("Notifying %s %s", exchange.displayName(), symbol);
@@ -125,7 +123,25 @@ public class MomentumScannerStrategy implements Strategy {
 		reported.clear();
 		reported.putAll(reportingThisCycle);
 	}
+	
+	private String calculatedVolumeDiffs(String symbol) {
+		Kline[] klines = restClient.klines(symbol, "1m", 100);
+		BigDecimal volumeSum = BigDecimal.ZERO;
+		
+		for(int i = 0; i < klines.length - 3; i++) {
+			volumeSum = volumeSum.add(klines[i].volume());
+		}
+		BigDecimal averageVolume = volumeSum.divide(new BigDecimal(klines.length));
 
+		Log.debugf("Symbol %s, avgVol: %s, vol-2: %s, vol-1: %s, vol: %s", symbol, averageVolume, klines[klines.length - 3].volume(),
+				klines[klines.length - 2].volume(), klines[klines.length - 1].volume());
+		
+		return String.format("vol: %s, %s, %s",
+				getPercentage(klines[klines.length - 3].volume(), averageVolume),
+				getPercentage(klines[klines.length - 2].volume(), averageVolume),
+				getPercentage(klines[klines.length - 1].volume(), averageVolume));
+	}
+	
 	private BigDecimal getPercentage(BigDecimal current, BigDecimal previous) {
 		return current.subtract(previous).divide(safeZero(previous), 4, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100));
 	}

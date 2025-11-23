@@ -20,6 +20,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.amuradon.tralon.agent.OrderType;
 import cz.amuradon.tralon.agent.Side;
 import cz.amuradon.tralon.agent.connector.AccountBalance;
+import cz.amuradon.tralon.agent.connector.Kline;
 import cz.amuradon.tralon.agent.connector.ListenKey;
 import cz.amuradon.tralon.agent.connector.OrderBookResponse;
 import cz.amuradon.tralon.agent.connector.OrderBookResponseImpl;
@@ -140,6 +141,16 @@ public class BinanceRestClient implements RestClient {
 			return mapper.readValue(spotClient.createMarket().ticker24H(Collections.emptyMap()), BinanceTicker[].class);
 		} catch (JsonProcessingException e) {
 			throw new IllegalStateException("Could not read 24h ticker.", e);
+		}
+	}
+	
+	@Override
+	public Kline[] klines(String symbol, String interval, int limit) {
+		try {
+			return mapper.readValue(spotClient.createMarket().klines(param("symbol", symbol)
+					.param("interval", interval).param("limit", limit)), Kline[].class);
+		} catch (JsonProcessingException e) {
+			throw new IllegalStateException("Could not read klines.", e);
 		}
 	}
 	

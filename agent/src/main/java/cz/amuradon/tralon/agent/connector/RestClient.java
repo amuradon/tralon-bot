@@ -26,6 +26,8 @@ public interface RestClient {
 	
 	Ticker[] ticker();
 	
+	Kline[] klines(String symbol, String interval, int limit);
+	
 	void setListener(RestClientListener listener);
 
 	interface NewOrderBuilder {
