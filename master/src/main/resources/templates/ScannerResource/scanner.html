@@ -29,7 +29,8 @@
       <th>Exchange</th>
       <th>Timestamp</th>
       <th>Data</th>
-      <th>Actions</th>
+      <th>TV</th>
+      <th>Terminal</th>
     </tr>
     </thead>
       {#for item in list}
@@ -38,7 +39,8 @@
 	    <td>{item.exchange}</td>
 	    <td>{item.timestamp}</td>
 	    <td>{item.data}</td>
-	    <td><a href="/terminal?symbol={item.symbol}&exchange={item.exchange}">Terminal</a></td>
+	    <td><a href="https://www.tradingview.com/chart/?symbol=BINANCE:{item.symbol}.P" target="_blank">TV</a></td>
+      <td><a href="/terminal?symbol={item.symbol}&exchange={item.exchange}" target="_blank">Terminal</a></td>
       </tr>
       {/for}
     </table>
