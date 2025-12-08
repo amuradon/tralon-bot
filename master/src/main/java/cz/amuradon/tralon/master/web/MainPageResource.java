@@ -134,12 +134,12 @@ public class MainPageResource {
 	@POST
 	@Path("/run-momentum-scanner")
 	@Produces(MediaType.TEXT_HTML)
-	public TemplateInstance runMomentumScanner(@RestForm String exchangeName, @RestForm int priceDelta,
-			@RestForm int usdVolume24h) {
+	public TemplateInstance runMomentumScanner(@RestForm String exchangeName, @RestForm int refreshInterval,
+			@RestForm int usdVolume24h,	@RestForm BigDecimal priceChange, @RestForm BigDecimal volumeChange) {
 		final Exchange exchange = Exchange.fromDisplayName(exchangeName);
 		return runStrategy(exchangeName, "0", "0", false, (r, w, s) ->
-				new MomentumScannerStrategy(exchange, r, scheduler, priceDelta, usdVolume24h,
-						symbolAlertsEmmitter, scannerDataEmmitter));
+				new MomentumScannerStrategy(exchange, r, scheduler, refreshInterval, usdVolume24h, priceChange,
+					volumeChange, symbolAlertsEmmitter, scannerDataEmmitter));
 	}
 
 	@POST

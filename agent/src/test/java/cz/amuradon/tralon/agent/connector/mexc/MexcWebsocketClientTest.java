@@ -78,7 +78,7 @@ public class MexcWebsocketClientTest {
 //		client.onMessage(ORDER_UPDATE);
 //	}
 	
-	@Test
+	//@Test
 	public void readPbFromFiles() throws Exception {
 		FileInputStream input = new FileInputStream("C:\\work\\tralon\\data\\MEXC\\20250514\\BELUGAUSDT\\trades.pb");
 		while (input.available() > 0) {

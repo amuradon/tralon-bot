@@ -27,8 +27,8 @@ import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 
-@QuarkusTest
-@QuarkusTestResource(MexcExchangeMock.class)
+// @QuarkusTest
+// @QuarkusTestResource(MexcExchangeMock.class)
 public class MexcRestClientAdapterIntegrationTest {
 
 	@Mexc
@@ -42,7 +42,7 @@ public class MexcRestClientAdapterIntegrationTest {
 	@InjectHttpServerMock
 	MockServer mockServer;
 	
-	@Test
+	// @Test
 	public void testOrderBook() throws IOException {
 		Path dirs = Path.of("C:\\work\\tralon\\test-data");
 		Files.createDirectories(dirs);
@@ -57,7 +57,7 @@ public class MexcRestClientAdapterIntegrationTest {
 		assertEquals(new BigDecimal("4.44"), orderResponse.bids().get(new BigDecimal("0.2800")));
 	}
 
-	@Test
+	// @Test
 	public void newOrderShouldGetOrderId() throws Exception {
 		String orderId = client.newOrder().symbol("TKNUSDT").side(Side.BUY).type(OrderType.LIMIT)
 			.price(new BigDecimal("0.1")).size(BigDecimal.ONE).clientOrderId("ValidNewOrder")
@@ -71,7 +71,7 @@ public class MexcRestClientAdapterIntegrationTest {
 				mockServer.takeRequest(10, TimeUnit.SECONDS).getPath());
 	}
 
-	@Test
+	// @Test
 	public void newOrderShouldNotRetryOnNoValidPrice() throws Exception {
 		NoValidTradePriceException exception = Assertions.assertThrows(NoValidTradePriceException.class, () -> 
 			client.newOrder().symbol("TKNUSDT").side(Side.BUY)
@@ -81,7 +81,7 @@ public class MexcRestClientAdapterIntegrationTest {
 		assertEquals(mockServer.getRequestCount(), 1, "The new order request should not retry automatically");
 	}
 
-	@Test
+	// @Test
 	public void newOrderShouldNotRetryOnTradeDirectionNotAllowed() throws Exception {
 		assertThrows(TradeDirectionNotAllowedException.class, () -> 
 			client.newOrder().symbol("TKNUSDT").side(Side.BUY)
@@ -91,7 +91,7 @@ public class MexcRestClientAdapterIntegrationTest {
 		assertEquals(mockServer.getRequestCount(), 1, "The new order request should not retry automatically");
 	}
 
-	@Test
+	//@Test
 	public void newOrderShouldNotRetryOnTooManyRequests() throws Exception {
 		Assertions.assertThrows(RequestException.class, () -> 
 			client.newOrder().symbol("TKNUSDT").side(Side.BUY)

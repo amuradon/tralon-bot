@@ -9,12 +9,18 @@
 	  {/for}
 	</select>
 	
-	<label for="usdVolume24h">USD volume 24h:</label>
+	<label for="refreshInterval">Refresh Interval [s]:</label>
+	<input name="refreshInterval" type="number" value="10"/>
+
+	<label for="usdVolume24h">USD volume 24h [USDT]:</label>
 	<input name="usdVolume24h" type="number" value="1000000"/>
 
-	<label for="priceDelta">Price delta:</label>
-	<input name="priceDelta" type="number" value="10"/>
+	<label for="priceChange">Price change [%]:</label>
+	<input name="priceChange" type="number" value="3"/>
 	
+	<label for="volumeChange">Volume change [x]:</label>
+	<input name="volumeChange" type="number" value="7"/>
+
 	<br/>
 	<input type="submit" value="Run" />
 </form>

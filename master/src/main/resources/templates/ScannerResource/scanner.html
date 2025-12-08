@@ -11,8 +11,8 @@
   <script src="https://unpkg.com/htmx-ext-sse@2.2.4"></script>
   <script src="scanner.js"></script>
   
-  <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css" />
   <link rel="stylesheet" href="tralon.css" />
+  <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css" />
 </head>
 <body>
 <h1>Tralon: Scanner</h1>
@@ -39,7 +39,7 @@
 	    <td>{item.exchange}</td>
 	    <td>{item.timestamp}</td>
 	    <td>{item.data}</td>
-	    <td><a href="https://www.tradingview.com/chart/?symbol=BINANCE:{item.symbol}.P" target="_blank">TV</a></td>
+	    <td><a href="{item.tradingViewLink}" target="_blank">TV</a></td>
       <td><a href="/terminal?symbol={item.symbol}&exchange={item.exchange}" target="_blank">Terminal</a></td>
       </tr>
       {/for}

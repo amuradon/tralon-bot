@@ -21,12 +21,17 @@ public enum Exchange {
 		}
 		
 		@Override
-		String terminalUrlPath(Ticker ticker) {
+		String exchangeLinkUrlPath(Ticker ticker) {
 			BinanceAlphaTicker casted = (BinanceAlphaTicker) ticker;
 			return casted.chainName().toLowerCase() + "/" + casted.contractAddress();
 		}
 	},
-	BINANCE_FUTURES("Binance Futures", BinanceFutures.LITERAL),  // For Futures USDT is allowed in EU
+	// For Futures USDT is allowed in EU
+	BINANCE_FUTURES("Binance Futures", BinanceFutures.LITERAL) {
+		String tradingViewLinkSymbol(String symbol) {
+			return String.format("BINANCE:%s.P", symbol);
+		}
+	},  
 	KUCOIN("Kucoin", Kucoin.LITERAL) {
 		@Override
 		public String symbol(String baseAsset, String quoteAsset) {
@@ -83,13 +88,23 @@ public enum Exchange {
 		return ticker.symbol().endsWith(quoteToken);
 	}
 
-	public String terminalUrl(Ticker ticker) {
+	public String exchangeLink(Ticker ticker) {
 		return String.format("%s/%s",
 				ConfigProvider.getConfig().getValue("exchanges." + name().toLowerCase() + ".baseUrl", String.class),
-				terminalUrlPath(ticker));
+				exchangeLinkUrlPath(ticker));
+	}
+
+	public String tradingViewLink(Ticker ticker) {
+		return String.format("https://www.tradingview.com/chart/?symbol=%s",
+				tradingViewLinkSymbol(ticker.symbol()));
 	}
 	
-	String terminalUrlPath(Ticker ticker) {
+	String exchangeLinkUrlPath(Ticker ticker) {
 		return ticker.symbol();
 	}
+
+	String tradingViewLinkSymbol(String symbol) {
+		return String.format("%s:%s", displayName.toUpperCase(), symbol);
+	}
+
 }

@@ -27,8 +27,10 @@ public class MomentumScannerStrategy implements Strategy {
 	private final Exchange exchange;
 	private final RestClient restClient;
 	private final ScheduledExecutorService scheduler;
-	private final int priceDelta;
+	private final int refreshInterval;
 	private final int usdVolume24h;
+	private final BigDecimal priceChange;
+	private final BigDecimal volumeChange;
 	private final Map<String, LinkedList<SymbolValues>> movingValues;
 	private final MutinyEmitter<SymbolAlert> symbolAlertsEmmitter;
 	private final MutinyEmitter<ScannerData> scannerDataEmitter;
@@ -36,13 +38,15 @@ public class MomentumScannerStrategy implements Strategy {
 	private ScheduledFuture<?> task;
 	
 	public MomentumScannerStrategy(Exchange exchange, RestClient restClient, final ScheduledExecutorService scheduler,
-			int priceDelta, int usdVolume24h,
+			int refreshInterval, int usdVolume24h, BigDecimal priceChange, BigDecimal volumeChange,
 			MutinyEmitter<SymbolAlert> symbolAlertsEmmitter, MutinyEmitter<ScannerData> scannerDataEmitter) {
 		this.exchange = exchange;
 		this.restClient = restClient;
 		this.scheduler = scheduler;
-		this.priceDelta = priceDelta;
+		this.refreshInterval = refreshInterval;
 		this.usdVolume24h = usdVolume24h;
+		this.priceChange = priceChange;
+		this.volumeChange = volumeChange;
 		this.movingValues = new HashMap<>();
 		this.symbolAlertsEmmitter = symbolAlertsEmmitter;
 		this.scannerDataEmitter = scannerDataEmitter;
@@ -58,7 +62,7 @@ public class MomentumScannerStrategy implements Strategy {
 				movingValues.put(ticker.symbol(), values);
 			}
 		}
-		task = scheduler.scheduleAtFixedRate(this::scan, 1, 1, TimeUnit.MINUTES);
+		task = scheduler.scheduleAtFixedRate(this::scan, 0, refreshInterval, TimeUnit.SECONDS);
 	}
 	
 	private LinkedList<SymbolValues> initiateValues(Ticker ticker) {
@@ -70,6 +74,7 @@ public class MomentumScannerStrategy implements Strategy {
 	}
 	
 	void scan() {
+		Log.infof("Scanning %s...", exchange.displayName());
 		Ticker[] tickers = restClient.ticker();
 		Map<String, String> reportingThisCycle = new HashMap<>();
 		List<ScannerDataItem> items = new ArrayList<>();
@@ -77,41 +82,58 @@ public class MomentumScannerStrategy implements Strategy {
 		for (Ticker ticker : tickers) {
 			if (filter(ticker)) {
 				String symbol = ticker.symbol();
+				// FIXME moving values je hard-coded pro refresh 1m, ne pro nastavitelny
 				LinkedList<SymbolValues> values = movingValues.computeIfAbsent(symbol, k -> initiateValues(ticker));
 				SymbolValues m15 = values.getFirst();
 				SymbolValues m5 = values.get(9);
 				SymbolValues m1 = values.getLast();
 				
-				// Spocitat % rozdilu pro cenu a volume
 				BigDecimal lastPrice = ticker.lastPrice();
 				
 				BigDecimal m1PriceChange = getPercentage(lastPrice, m1.lastPrice());
 				BigDecimal m5PriceChange = getPercentage(lastPrice, m5.lastPrice());
 				BigDecimal m15PriceChange = getPercentage(lastPrice, m15.lastPrice());
-				if (aboveThreshold(m1PriceChange) || aboveThreshold(m5PriceChange)) {
-					String volumeDiffs = calculatedVolumeDiffs(symbol);
+				if (priceFilter(m1PriceChange) || priceFilter(m5PriceChange)) {
+					Log.debugf("Price filter PASSED %s: %s, %s, %s, %s", exchange.displayName(),
+							symbol, m1PriceChange, m5PriceChange, m15PriceChange);
+					VolumeData volumeData = calculatedVolumeDiffs(symbol);
+					BigDecimal volumeDiff_2 = getPercentage(volumeData.lastVolume_2(), volumeData.average());
+					BigDecimal volumeDiff_1 = getPercentage(volumeData.lastVolume_1(), volumeData.average());
+					BigDecimal volumeDiff = getPercentage(volumeData.lastVolume(), volumeData.average());
+					String volumeFilterResult = "FAILED";
+					if (volumeFilter(volumeDiff) || volumeFilter(volumeDiff_1) || volumeFilter(volumeDiff_2)) {
+						volumeFilterResult = "PASSED";
 					
-					String timestamp = currentCycleTimestamp;
-					boolean isNew = true;
-					String previouslyReported = reported.get(symbol);
-					if (previouslyReported != null) {
-						timestamp = previouslyReported;
-						isNew = false;
-					}
-					reportingThisCycle.put(symbol, timestamp);
-					items.add(new ScannerDataItem(symbol, exchange.displayName(),
-							exchange.terminalUrl(ticker), timestamp, isNew,
-							String.format("24h: %s, w: %s, 1p: %s, 5p: %s, 15p: %s, %s",
-							ticker.priceChangePercent(), getPercentage(ticker.lastPrice(), ticker.weightedAvgPrice()),
-							m1PriceChange, m5PriceChange, m15PriceChange, volumeDiffs)));
-					
-					if (!reported.containsKey(symbol)) {
-						Log.infof("Notifying %s %s", exchange.displayName(), symbol);
-						if (symbolAlertsEmmitter.hasRequests()) {
-							symbolAlertsEmmitter.sendAndForget(new SymbolAlert(symbol, exchange.displayName(),
-									timestamp));
+						String timestamp = currentCycleTimestamp;
+						boolean isNew = true;
+						String previouslyReported = reported.get(symbol);
+						if (previouslyReported != null) {
+							timestamp = previouslyReported;
+							isNew = false;
 						}
+						reportingThisCycle.put(symbol, timestamp);
+						String alert = String.format("24h: %s, w: %s, 1p: %s, 5p: %s, 15p: %s, vol: %s, %s, %s",
+							ticker.priceChangePercent(), getPercentage(ticker.lastPrice(), ticker.weightedAvgPrice()),
+							m1PriceChange, m5PriceChange, m15PriceChange,
+							volumeDiff_2,
+							volumeDiff_1,
+							volumeDiff);
+						Log.infof("%s Symbol %s, %s", exchange.displayName(), symbol, alert);
+						items.add(new ScannerDataItem(symbol, exchange.displayName(),
+								exchange.exchangeLink(ticker), timestamp, isNew,
+								alert, exchange.tradingViewLink(ticker)));
+						
+						if (!reported.containsKey(symbol)) {
+							Log.infof("Notifying %s %s", exchange.displayName(), symbol);
+							if (symbolAlertsEmmitter.hasRequests()) {
+								symbolAlertsEmmitter.sendAndForget(new SymbolAlert(symbol, exchange.displayName(),
+										timestamp));
+							}
+						}
+					} else {
 					}
+					Log.debugf("Volume filter %s %s: %s, %s, %s, %s", volumeFilterResult, exchange.displayName(),
+							symbol, volumeDiff_2, volumeDiff_1, volumeDiff);
 				}
 				values.removeFirst();
 				values.addLast(new SymbolValues(ticker.lastPrice(), ticker.quoteVolume()));
@@ -124,7 +146,7 @@ public class MomentumScannerStrategy implements Strategy {
 		reported.putAll(reportingThisCycle);
 	}
 	
-	private String calculatedVolumeDiffs(String symbol) {
+	private VolumeData calculatedVolumeDiffs(String symbol) {
 		Kline[] klines = restClient.klines(symbol, "1m", 100);
 		BigDecimal volumeSum = BigDecimal.ZERO;
 		
@@ -133,13 +155,8 @@ public class MomentumScannerStrategy implements Strategy {
 		}
 		BigDecimal averageVolume = volumeSum.divide(new BigDecimal(klines.length));
 
-		Log.debugf("Symbol %s, avgVol: %s, vol-2: %s, vol-1: %s, vol: %s", symbol, averageVolume, klines[klines.length - 3].volume(),
+		return new VolumeData(averageVolume, klines[klines.length - 3].volume(),
 				klines[klines.length - 2].volume(), klines[klines.length - 1].volume());
-		
-		return String.format("vol: %s, %s, %s",
-				getPercentage(klines[klines.length - 3].volume(), averageVolume),
-				getPercentage(klines[klines.length - 2].volume(), averageVolume),
-				getPercentage(klines[klines.length - 1].volume(), averageVolume));
 	}
 	
 	private BigDecimal getPercentage(BigDecimal current, BigDecimal previous) {
@@ -150,8 +167,12 @@ public class MomentumScannerStrategy implements Strategy {
 		return value.compareTo(BigDecimal.ZERO) == 0 ? new BigDecimal("0.000001") : value;
 	}
 	
-	private boolean aboveThreshold(BigDecimal value) {
-		return value.compareTo(BigDecimal.valueOf(priceDelta)) == 1;
+	private boolean priceFilter(BigDecimal value) {
+		return value.compareTo(priceChange) == 1;
+	}
+
+	private boolean volumeFilter(BigDecimal value) {
+		return value.compareTo(volumeChange.multiply(new BigDecimal(100))) == 1;
 	}
 	
 	private boolean filter(Ticker ticker) {
