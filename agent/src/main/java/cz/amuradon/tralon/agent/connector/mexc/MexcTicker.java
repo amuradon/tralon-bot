@@ -7,12 +7,18 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import cz.amuradon.tralon.agent.connector.Ticker;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record MexcTicker(String symbol,
-		long closeTime,
+public record MexcTicker(
+		String symbol,
+		BigDecimal priceChangePercent,
 		BigDecimal lastPrice,
-		BigDecimal quoteVolume,
+		BigDecimal openPrice,
+		BigDecimal highPrice,
+		BigDecimal lowPrice,
 		BigDecimal volume,
-		BigDecimal priceChangePercent) implements Ticker {
+		BigDecimal quoteVolume,
+		long openTime,
+		long closeTime,
+		long count) implements Ticker {
 	
 	@Override
 	public String toString() {
@@ -23,4 +29,20 @@ public record MexcTicker(String symbol,
 	public BigDecimal weightedAvgPrice() {
 		return lastPrice;  // FIXME nevypada, ze by v payloadu bylo
 	}
+
+	@Override
+	public long firstId() {
+		return 0; // Not supported
+	}
+
+	@Override
+	public long lastId() {
+		return 0; // Not supported
+	}
+
+	@Override
+	public BigDecimal lastQty() {
+		return BigDecimal.ZERO; // Not supported
+	}
+
 }

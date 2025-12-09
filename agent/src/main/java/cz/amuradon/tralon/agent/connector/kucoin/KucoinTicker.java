@@ -49,4 +49,44 @@ public class KucoinTicker implements Ticker {
 		return ticker.getAveragePrice();  // not clear if it's weighted
 	}
 
+	@Override
+	public BigDecimal highPrice() {
+		return ticker.getHigh();
+	}
+
+	@Override
+	public long firstId() {
+		return 0; // Not supported
+	}
+
+	@Override
+	public long lastId() {
+		return 0; // Not supported
+	}
+
+	@Override
+	public long count() {
+		return 0; // Not supported
+	}
+
+	@Override
+	public BigDecimal lastQty() {
+		return BigDecimal.ZERO; // Not supported
+	}
+
+	@Override
+	public BigDecimal openPrice() {
+		return BigDecimal.ZERO; // Not supported
+	}
+
+	@Override
+	public BigDecimal lowPrice() {
+		return BigDecimal.ZERO; // Not supported
+	}
+
+	@Override
+	public long openTime() {
+		return 0; // Not supported
+	}
+
 }

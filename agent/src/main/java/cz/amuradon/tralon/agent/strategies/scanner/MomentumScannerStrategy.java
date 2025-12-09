@@ -12,13 +12,13 @@ import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import cz.amuradon.tralon.agent.connector.Exchange;
 import cz.amuradon.tralon.agent.connector.Kline;
 import cz.amuradon.tralon.agent.connector.RestClient;
 import cz.amuradon.tralon.agent.connector.Ticker;
 import cz.amuradon.tralon.agent.strategies.Strategy;
-import cz.amuradon.tralon.agent.strategies.SymbolValues;
 import io.quarkus.logging.Log;
 import io.smallrye.reactive.messaging.MutinyEmitter;
 
@@ -31,7 +31,8 @@ public class MomentumScannerStrategy implements Strategy {
 	private final int usdVolume24h;
 	private final BigDecimal priceChange;
 	private final BigDecimal volumeChange;
-	private final Map<String, LinkedList<SymbolValues>> movingValues;
+	private final int tickersInMinute;
+	private final Map<String, LinkedList<Ticker>> movingValues;
 	private final MutinyEmitter<SymbolAlert> symbolAlertsEmmitter;
 	private final MutinyEmitter<ScannerData> scannerDataEmitter;
 	private final Map<String, String> reported;
@@ -43,10 +44,11 @@ public class MomentumScannerStrategy implements Strategy {
 		this.exchange = exchange;
 		this.restClient = restClient;
 		this.scheduler = scheduler;
-		this.refreshInterval = refreshInterval;
+		this.refreshInterval = refreshInterval * 10;
 		this.usdVolume24h = usdVolume24h;
 		this.priceChange = priceChange;
 		this.volumeChange = volumeChange;
+		this.tickersInMinute = 60 / this.refreshInterval;
 		this.movingValues = new HashMap<>();
 		this.symbolAlertsEmmitter = symbolAlertsEmmitter;
 		this.scannerDataEmitter = scannerDataEmitter;
@@ -58,17 +60,17 @@ public class MomentumScannerStrategy implements Strategy {
 		Ticker[] tickers = restClient.ticker();
 		for (Ticker ticker : tickers) {
 			if (filter(ticker)) {
-				LinkedList<SymbolValues> values = initiateValues(ticker);
+				LinkedList<Ticker> values = initiateValues(ticker);
 				movingValues.put(ticker.symbol(), values);
 			}
 		}
 		task = scheduler.scheduleAtFixedRate(this::scan, 0, refreshInterval, TimeUnit.SECONDS);
 	}
 	
-	private LinkedList<SymbolValues> initiateValues(Ticker ticker) {
-		LinkedList<SymbolValues> values = new LinkedList<>();
-		for (int i = 0; i < 15; i++) {
-			values.add(new SymbolValues(ticker.lastPrice(), ticker.quoteVolume()));
+	private LinkedList<Ticker> initiateValues(Ticker ticker) {
+		LinkedList<Ticker> values = new LinkedList<>();
+		for (int i = 0; i < 5 * tickersInMinute; i++) {
+			values.add(ticker);
 		}
 		return values;
 	}
@@ -82,20 +84,25 @@ public class MomentumScannerStrategy implements Strategy {
 		for (Ticker ticker : tickers) {
 			if (filter(ticker)) {
 				String symbol = ticker.symbol();
-				// FIXME moving values je hard-coded pro refresh 1m, ne pro nastavitelny
-				LinkedList<SymbolValues> values = movingValues.computeIfAbsent(symbol, k -> initiateValues(ticker));
-				SymbolValues m15 = values.getFirst();
-				SymbolValues m5 = values.get(9);
-				SymbolValues m1 = values.getLast();
+				LinkedList<Ticker> values = movingValues.computeIfAbsent(symbol, k -> initiateValues(ticker));
+				Ticker m_5 = values.getFirst();
+				Ticker m_2 = values.get(values.size() - 2 * tickersInMinute);
+				Ticker m_1 = values.get(values.size() - tickersInMinute);
+				
+				// XXX Kline nevraci aktualni candle, tzn. volume sleduji po 1m, i kdyz je frekvence market dat pull vetsi!
+				// FIXME nejak divne se pocita volume, ale z Kline REST API se cte spravne
 				
 				BigDecimal lastPrice = ticker.lastPrice();
 				
-				BigDecimal m1PriceChange = getPercentage(lastPrice, m1.lastPrice());
-				BigDecimal m5PriceChange = getPercentage(lastPrice, m5.lastPrice());
-				BigDecimal m15PriceChange = getPercentage(lastPrice, m15.lastPrice());
-				if (priceFilter(m1PriceChange) || priceFilter(m5PriceChange)) {
-					Log.debugf("Price filter PASSED %s: %s, %s, %s, %s", exchange.displayName(),
-							symbol, m1PriceChange, m5PriceChange, m15PriceChange);
+				BigDecimal m1PriceChange = getPercentage(lastPrice, m_1.lastPrice());
+				BigDecimal m2PriceChange = getPercentage(lastPrice, m_2.lastPrice());
+				BigDecimal m5PriceChange = getPercentage(lastPrice, m_5.lastPrice());
+				if (priceFilter(m1PriceChange) || priceFilter(m2PriceChange) || priceFilter(m5PriceChange)) {
+					Log.debugf("Price filter PASSED %s: %s -> p[$]: %s, %s, %s, %s, d[%%]: %s, %s, %s\n%s",
+							exchange.displayName(),	symbol,
+							m_5, m_2, m_1, lastPrice,
+							m5PriceChange, m2PriceChange, m1PriceChange, 
+							values.stream().map(Ticker::toString).collect(Collectors.joining("\n")));
 					VolumeData volumeData = calculatedVolumeDiffs(symbol);
 					BigDecimal volumeDiff_2 = getPercentage(volumeData.lastVolume_2(), volumeData.average());
 					BigDecimal volumeDiff_1 = getPercentage(volumeData.lastVolume_1(), volumeData.average());
@@ -112,9 +119,9 @@ public class MomentumScannerStrategy implements Strategy {
 							isNew = false;
 						}
 						reportingThisCycle.put(symbol, timestamp);
-						String alert = String.format("24h: %s, w: %s, 1p: %s, 5p: %s, 15p: %s, vol: %s, %s, %s",
+						String alert = String.format("24h: %s, w: %s, 1p: %s, 2p: %s, 5p: %s, vol: %s, %s, %s",
 							ticker.priceChangePercent(), getPercentage(ticker.lastPrice(), ticker.weightedAvgPrice()),
-							m1PriceChange, m5PriceChange, m15PriceChange,
+							m1PriceChange, m2PriceChange, m5PriceChange,
 							volumeDiff_2,
 							volumeDiff_1,
 							volumeDiff);
@@ -130,13 +137,14 @@ public class MomentumScannerStrategy implements Strategy {
 										timestamp));
 							}
 						}
-					} else {
-					}
-					Log.debugf("Volume filter %s %s: %s, %s, %s, %s", volumeFilterResult, exchange.displayName(),
-							symbol, volumeDiff_2, volumeDiff_1, volumeDiff);
+					} 
+					Log.debugf("Volume filter %s %s: %s -> v[T]: %s (avg), %s, %s, %s, d[%%]: %s, %s, %s",
+							volumeFilterResult, exchange.displayName(),	symbol,
+							volumeData.average(), volumeData.lastVolume_2(), volumeData.lastVolume_1(), volumeData.lastVolume(),
+							volumeDiff_2, volumeDiff_1, volumeDiff);
 				}
 				values.removeFirst();
-				values.addLast(new SymbolValues(ticker.lastPrice(), ticker.quoteVolume()));
+				values.addLast(ticker);
 			}
 		}
 		if (scannerDataEmitter.hasRequests()) {

@@ -7,17 +7,21 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import cz.amuradon.tralon.agent.connector.Ticker;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record BinanceTicker(String symbol,
-		long closeTime,
-		BigDecimal lastPrice,
-		BigDecimal quoteVolume,
-		BigDecimal volume,
+public record BinanceTicker(
+		String symbol,
 		BigDecimal priceChangePercent,
-		BigDecimal weightedAvgPrice) implements Ticker {
+		BigDecimal weightedAvgPrice,
+		BigDecimal lastPrice,
+		BigDecimal lastQty,
+		BigDecimal openPrice,
+		BigDecimal highPrice,
+		BigDecimal lowPrice,
+		BigDecimal volume,
+		BigDecimal quoteVolume,
+		long openTime,
+		long closeTime,
+		long firstId,
+		long lastId,
+		long count) implements Ticker {
 	
-	@Override
-	public String toString() {
-		return String.format("BinanceTicker(%s, %d, %s, %s, %s, %s, %s)", symbol, closeTime, lastPrice, quoteVolume,
-				volume, priceChangePercent, weightedAvgPrice);
-	}
 }
