@@ -10,9 +10,10 @@ import org.eclipse.microprofile.reactive.messaging.Channel;
 import org.jboss.resteasy.reactive.RestStreamElementType;
 
 import cz.amuradon.tralon.agent.connector.Exchange;
-import cz.amuradon.tralon.agent.strategies.scanner.ScannerData;
-import cz.amuradon.tralon.agent.strategies.scanner.ScannerDataItem;
-import cz.amuradon.tralon.agent.strategies.scanner.SymbolAlert;
+import cz.amuradon.tralon.agent.strategies.scanner.momentum.MomentumScannerStrategy;
+import cz.amuradon.tralon.agent.strategies.scanner.momentum.ScannerData;
+import cz.amuradon.tralon.agent.strategies.scanner.momentum.ScannerDataItem;
+import cz.amuradon.tralon.agent.strategies.scanner.momentum.SymbolAlert;
 import io.quarkus.qute.CheckedTemplate;
 import io.quarkus.qute.TemplateInstance;
 import io.smallrye.mutiny.Multi;
@@ -25,9 +26,9 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.sse.OutboundSseEvent;
 import jakarta.ws.rs.sse.Sse;
 
-@Path("/scanner")
+@Path(MomentumScannerStrategy.DASHBOARD_LINK)
 @ApplicationScoped
-public class ScannerResource {
+public class MomentumScannerResource {
 
 	private final Multi<ScannerData> scannerDataChannel;
 	private final Multi<SymbolAlert> symbolAlertsChannel;
@@ -35,7 +36,7 @@ public class ScannerResource {
 	private Map<String, List<ScannerDataItem>> data;
 	
 	@Inject
-	public ScannerResource(@Channel(ScannerData.CHANNEL) Multi<ScannerData> scannerDataChannel,
+	public MomentumScannerResource(@Channel(ScannerData.CHANNEL) Multi<ScannerData> scannerDataChannel,
 			@Channel(SymbolAlert.CHANNEL) Multi<SymbolAlert> symbolAlertsChannel,
 			Sse sse) {
 		this.scannerDataChannel = scannerDataChannel;
@@ -52,7 +53,7 @@ public class ScannerResource {
 	@GET
 	@Produces(MediaType.TEXT_HTML)
 	public TemplateInstance scanner() {
-		return Templates.scanner(Arrays.stream(Exchange.values()).map(Exchange::displayName).collect(Collectors.toList()), data);
+		return Templates.momentumScanner(Arrays.stream(Exchange.values()).map(Exchange::displayName).collect(Collectors.toList()), data);
 	}
 
 	// FIXME vice scanneru se pere o tabulku, prepisuji si ji
@@ -62,7 +63,7 @@ public class ScannerResource {
 	public Multi<OutboundSseEvent> tableUpdates() {
 		return scannerDataChannel.map(d -> {
 			data.put(d.exchange(), d.data());
-			return sse.newEvent(d.exchange(), Templates.scanner$exchangeTable(d.data()).render());
+			return sse.newEvent(d.exchange(), Templates.momentumScanner$exchangeTable(d.data()).render());
 		});
 	}
 
@@ -75,8 +76,8 @@ public class ScannerResource {
 	
 	@CheckedTemplate
 	public static class Templates {
-		public static native TemplateInstance scanner(List<String> exchanges, Map<String, List<ScannerDataItem>> data);
-		public static native TemplateInstance scanner$exchangeTable (List<ScannerDataItem> list);
+		public static native TemplateInstance momentumScanner(List<String> exchanges, Map<String, List<ScannerDataItem>> data);
+		public static native TemplateInstance momentumScanner$exchangeTable (List<ScannerDataItem> list);
 	}
 	
 }

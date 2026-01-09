@@ -1,11 +1,11 @@
 {@java.util.List<String> exchanges}
-{@java.util.Map<String, java.util.List<cz.amuradon.tralon.agent.strategies.scanner.ScannerDataItem>> data}
+{@java.util.Map<String, java.util.List<cz.amuradon.tralon.agent.strategies.scanner.momentum.ScannerDataItem>> data}
 
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Tralon: Scanner</title>
+  <title>Tralon: Momentum Scanner</title>
 
   <script src="https://unpkg.com/htmx.org@2.0.7"></script>
   <script src="https://unpkg.com/htmx-ext-sse@2.2.4"></script>
@@ -15,8 +15,8 @@
   <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css" />
 </head>
 <body>
-<h1>Tralon: Scanner</h1>
-<div id="scannerData" hx-ext="sse" sse-connect="/scanner/tableUpdates">
+<h1>Tralon: Momentum Scanner</h1>
+<div id="scannerData" hx-ext="sse" sse-connect="/momentumScanner/tableUpdates">
   {#for name in exchanges}
   <div sse-swap="{name}">
     {#let list=data.get(name)}
@@ -47,7 +47,7 @@
     {/fragment}
     {/if}
   </div>
-  <div class="symbolAlerts" hx-ext="sse" sse-connect="/scanner/symbolAlerts" sse-swap="{name}" hx-swap="none"></div>
+  <div class="symbolAlerts" hx-ext="sse" sse-connect="/momentumScanner/symbolAlerts" sse-swap="{name}" hx-swap="none"></div>
   {/for}
   <div id="notifications" class="notifications"></div>
 </div>

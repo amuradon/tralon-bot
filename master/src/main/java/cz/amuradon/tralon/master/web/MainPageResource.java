@@ -29,9 +29,10 @@ import cz.amuradon.tralon.agent.strategies.newlisting.FixedPercentClosePositionU
 import cz.amuradon.tralon.agent.strategies.newlisting.NewListingStrategy;
 import cz.amuradon.tralon.agent.strategies.newlisting.TrailingProfitStopUpdatesProcessor;
 import cz.amuradon.tralon.agent.strategies.newlisting.UpdatesProcessor;
-import cz.amuradon.tralon.agent.strategies.scanner.MomentumScannerStrategy;
-import cz.amuradon.tralon.agent.strategies.scanner.ScannerData;
-import cz.amuradon.tralon.agent.strategies.scanner.SymbolAlert;
+import cz.amuradon.tralon.agent.strategies.scanner.arbitrage.perpetual.funding.PerpetualFundingArbitrageScanner;
+import cz.amuradon.tralon.agent.strategies.scanner.momentum.MomentumScannerStrategy;
+import cz.amuradon.tralon.agent.strategies.scanner.momentum.ScannerData;
+import cz.amuradon.tralon.agent.strategies.scanner.momentum.SymbolAlert;
 import io.quarkus.logging.Log;
 import io.quarkus.qute.CheckedTemplate;
 import io.quarkus.qute.TemplateInstance;
@@ -53,6 +54,7 @@ public class MainPageResource {
 	private static final String MARKET_MAKING = "Market Making";
 	private static final String MOMENTUM_SCANNER = "Momentum Scanner";
 	private static final String NEW_LISTING = "New Listing";
+	private static final String PERP_FUNDING_ARBITRAGE_SCANNER = "Perp Funding Arbitrage Scanner";
 
 	private final StrategyFactory strategyFactory;
 	
@@ -90,7 +92,8 @@ public class MainPageResource {
 	@GET
 	@Produces(MediaType.TEXT_HTML)
 	public TemplateInstance index() {
-		return Templates.index(Arrays.asList(MOMENTUM_SCANNER, MARKET_MAKING, NEW_LISTING));
+		return Templates.index(Arrays.asList(MOMENTUM_SCANNER, PERP_FUNDING_ARBITRAGE_SCANNER,
+				MARKET_MAKING, NEW_LISTING));
 	}
 
 	@GET
@@ -121,6 +124,8 @@ public class MainPageResource {
 		Log.infof("Chosen strategy: %s", strategy);
 		if (strategy.equalsIgnoreCase(MOMENTUM_SCANNER)) {
 			return Templates.momentumScanner(supportedExchanges);
+		} else if (strategy.equalsIgnoreCase(PERP_FUNDING_ARBITRAGE_SCANNER)) {
+			return Templates.perpFundingArbitrageScanner();
 		} else if (strategy.equalsIgnoreCase(MARKET_MAKING)) {
 			return Templates.marketMaking(supportedExchanges, Arrays.stream(SpreadStrategies.values())
 					.collect(Collectors.toMap(e -> e.displayName(), e -> e.valueCaption())));
@@ -140,6 +145,23 @@ public class MainPageResource {
 		return runStrategy(exchangeName, "0", "0", false, (r, w, s) ->
 				new MomentumScannerStrategy(exchange, r, scheduler, refreshInterval, usdVolume24h, priceChange,
 					volumeChange, symbolAlertsEmmitter, scannerDataEmmitter));
+	}
+
+	@POST
+	@Path("/run-perp-funding-arbitrage-scanner")
+	@Produces(MediaType.TEXT_HTML)
+	public TemplateInstance runPerpFundingArbitrageScanner() {
+		PerpetualFundingArbitrageScanner strategy = PerpetualFundingArbitrageScanner.create();
+		String strategyId = strategy.getDescription();
+		if (runningStrategies.containsKey(strategyId)) {
+			String error = String.format("There is already running strategy for %s", strategyId);
+			Log.error(error);
+			throw new BadRequestException(error);
+		}
+		strategy.start();
+		runningStrategies.put(strategyId, strategy);
+		Log.infof("Started strategy: %s", strategyId);
+		return Templates.runningStrategies(runningStrategies);
 	}
 
 	@POST
@@ -253,6 +275,7 @@ public class MainPageResource {
 		public static native TemplateInstance index(List<String> strategies);
 		public static native TemplateInstance runningStrategies(Map<String, Strategy> runningStrategies);
 		public static native TemplateInstance momentumScanner(List<String> exchanges);
+		public static native TemplateInstance perpFundingArbitrageScanner();
 		public static native TemplateInstance marketMaking(List<String> exchanges, Map<String, String> spreadStrategies);
 		public static native TemplateInstance newListing(List<String> exchanges);
 		public static native TemplateInstance noneStrategy();

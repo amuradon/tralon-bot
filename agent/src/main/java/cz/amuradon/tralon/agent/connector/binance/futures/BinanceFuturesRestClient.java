@@ -6,8 +6,10 @@ import java.util.Map;
 import org.apache.commons.lang3.NotImplementedException;
 
 import cz.amuradon.tralon.agent.connector.AccountBalance;
+import cz.amuradon.tralon.agent.connector.FundingRate;
 import cz.amuradon.tralon.agent.connector.Kline;
 import cz.amuradon.tralon.agent.connector.OrderBookResponse;
+import cz.amuradon.tralon.agent.connector.PerpetualFundingRateRestClient;
 import cz.amuradon.tralon.agent.connector.RestClient;
 import cz.amuradon.tralon.agent.connector.RestClientFactory;
 import cz.amuradon.tralon.agent.connector.RestClientListener;
@@ -19,7 +21,7 @@ import jakarta.enterprise.context.Dependent;
 @Dependent
 @BinanceFutures
 @RestClientFactory // Required for proper usage with Instance
-public class BinanceFuturesRestClient implements RestClient {
+public class BinanceFuturesRestClient implements RestClient, PerpetualFundingRateRestClient {
 
 	private final BinanceFuturesClient client;
 	
@@ -76,6 +78,16 @@ public class BinanceFuturesRestClient implements RestClient {
 	@Override
 	public void setListener(RestClientListener listener) {
 		throw new NotImplementedException("Not implemented");
+	}
+
+	@Override
+	public List<FundingRate> fundingRates() {
+		return client.fundingRates();
+	}
+
+	@Override
+	public String exchangeName() {
+		return "Binance";
 	}
 
 }

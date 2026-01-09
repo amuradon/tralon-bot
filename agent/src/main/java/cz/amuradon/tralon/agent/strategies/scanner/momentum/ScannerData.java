@@ -1,4 +1,4 @@
-package cz.amuradon.tralon.agent.strategies.scanner;
+package cz.amuradon.tralon.agent.strategies.scanner.momentum;
 
 import java.util.List;
 

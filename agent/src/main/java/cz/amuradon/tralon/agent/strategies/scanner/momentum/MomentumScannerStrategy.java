@@ -1,4 +1,4 @@
-package cz.amuradon.tralon.agent.strategies.scanner;
+package cz.amuradon.tralon.agent.strategies.scanner.momentum;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -23,6 +23,8 @@ import io.quarkus.logging.Log;
 import io.smallrye.reactive.messaging.MutinyEmitter;
 
 public class MomentumScannerStrategy implements Strategy {
+	
+	public static final String DASHBOARD_LINK = "/momentumScanner";
 
 	private final Exchange exchange;
 	private final RestClient restClient;
@@ -89,7 +91,6 @@ public class MomentumScannerStrategy implements Strategy {
 				Ticker m_2 = values.get(values.size() - 2 * tickersInMinute);
 				Ticker m_1 = values.get(values.size() - tickersInMinute);
 				
-				// XXX Kline nevraci aktualni candle, tzn. volume sleduji po 1m, i kdyz je frekvence market dat pull vetsi!
 				// FIXME nejak divne se pocita volume, ale z Kline REST API se cte spravne
 				
 				BigDecimal lastPrice = ticker.lastPrice();
@@ -107,8 +108,10 @@ public class MomentumScannerStrategy implements Strategy {
 					BigDecimal volumeDiff_2 = getPercentage(volumeData.lastVolume_2(), volumeData.average());
 					BigDecimal volumeDiff_1 = getPercentage(volumeData.lastVolume_1(), volumeData.average());
 					BigDecimal volumeDiff = getPercentage(volumeData.lastVolume(), volumeData.average());
+					BigDecimal predictedVolumeDiff = getPercentage(volumeData.predictedVolume(), volumeData.average());
 					String volumeFilterResult = "FAILED";
-					if (volumeFilter(volumeDiff) || volumeFilter(volumeDiff_1) || volumeFilter(volumeDiff_2)) {
+					if (volumeFilter(predictedVolumeDiff) || volumeFilter(volumeDiff)
+							|| volumeFilter(volumeDiff_1) || volumeFilter(volumeDiff_2)) {
 						volumeFilterResult = "PASSED";
 					
 						String timestamp = currentCycleTimestamp;
@@ -119,12 +122,13 @@ public class MomentumScannerStrategy implements Strategy {
 							isNew = false;
 						}
 						reportingThisCycle.put(symbol, timestamp);
-						String alert = String.format("24h: %s, w: %s, 1p: %s, 2p: %s, 5p: %s, vol: %s, %s, %s",
+						String alert = String.format("24h: %s, w: %s, 1p: %s, 2p: %s, 5p: %s, vol: %s, %s, %s, %s",
 							ticker.priceChangePercent(), getPercentage(ticker.lastPrice(), ticker.weightedAvgPrice()),
 							m1PriceChange, m2PriceChange, m5PriceChange,
 							volumeDiff_2,
 							volumeDiff_1,
-							volumeDiff);
+							volumeDiff,
+							predictedVolumeDiff);
 						Log.infof("%s Symbol %s, %s", exchange.displayName(), symbol, alert);
 						items.add(new ScannerDataItem(symbol, exchange.displayName(),
 								exchange.exchangeLink(ticker), timestamp, isNew,
@@ -138,10 +142,10 @@ public class MomentumScannerStrategy implements Strategy {
 							}
 						}
 					} 
-					Log.debugf("Volume filter %s %s: %s -> v[T]: %s (avg), %s, %s, %s, d[%%]: %s, %s, %s",
+					Log.debugf("Volume filter %s %s: %s -> %s, d[%%]: %s, %s, %s, %s",
 							volumeFilterResult, exchange.displayName(),	symbol,
-							volumeData.average(), volumeData.lastVolume_2(), volumeData.lastVolume_1(), volumeData.lastVolume(),
-							volumeDiff_2, volumeDiff_1, volumeDiff);
+							volumeData.toString(),
+							volumeDiff_2, volumeDiff_1, volumeDiff, predictedVolumeDiff);
 				}
 				values.removeFirst();
 				values.addLast(ticker);
@@ -155,6 +159,7 @@ public class MomentumScannerStrategy implements Strategy {
 	}
 	
 	private VolumeData calculatedVolumeDiffs(String symbol) {
+		long currentTime = System.currentTimeMillis();
 		Kline[] klines = restClient.klines(symbol, "1m", 100);
 		BigDecimal volumeSum = BigDecimal.ZERO;
 		
@@ -163,8 +168,13 @@ public class MomentumScannerStrategy implements Strategy {
 		}
 		BigDecimal averageVolume = volumeSum.divide(new BigDecimal(klines.length));
 
+		Kline currentKline = klines[klines.length - 1];
+		BigDecimal currentVolume = currentKline.volume();
+		long period = currentTime - currentKline.openTime();
+		BigDecimal expectedVolume = currentVolume.divide(new BigDecimal(period), 20, RoundingMode.HALF_UP).multiply(new BigDecimal(60000));
+		
 		return new VolumeData(averageVolume, klines[klines.length - 3].volume(),
-				klines[klines.length - 2].volume(), klines[klines.length - 1].volume());
+				klines[klines.length - 2].volume(), currentVolume, expectedVolume);
 	}
 	
 	private BigDecimal getPercentage(BigDecimal current, BigDecimal previous) {
@@ -200,7 +210,7 @@ public class MomentumScannerStrategy implements Strategy {
 
 	@Override
 	public String link() {
-		return "/scanner";
+		return DASHBOARD_LINK;
 	}
 
 }

@@ -1,11 +1,14 @@
 package cz.amuradon.tralon.agent.connector.binance.futures;
 
+import java.util.List;
+
 import org.eclipse.microprofile.faulttolerance.Retry;
 import org.eclipse.microprofile.rest.client.annotation.ClientHeaderParam;
 import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
 import org.jboss.resteasy.reactive.RestQuery;
 
 import cz.amuradon.tralon.agent.connector.Kline;
+import cz.amuradon.tralon.agent.connector.FundingRate;
 import cz.amuradon.tralon.agent.connector.binance.BinanceTicker;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
@@ -23,4 +26,7 @@ public interface BinanceFuturesClient {
 	@GET
 	Kline[] klines(@RestQuery String symbol, @RestQuery String interval, @RestQuery int limit);
 	
+	@Path("/fapi/v1/premiumIndex")
+	@GET
+	List<FundingRate> fundingRates();
 }

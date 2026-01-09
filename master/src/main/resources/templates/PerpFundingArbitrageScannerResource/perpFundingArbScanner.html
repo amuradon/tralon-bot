@@ -1,0 +1,46 @@
+{@java.util.List<java.util.List<String>> data}
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Tralon: Perpetual Funding Arbitrage Scanner</title>
+
+  <script src="https://unpkg.com/htmx.org@2.0.7"></script>
+  <script src="https://unpkg.com/htmx-ext-sse@2.2.4"></script>
+  <script src="scanner.js"></script>
+  
+  <link rel="stylesheet" href="tralon.css" />
+  <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css" />
+</head>
+<body>
+<h1>Tralon: Perpetual Funding Arbitrage Scanner</h1>
+<div id="scannerData" hx-ext="sse" sse-connect="/perpFundArbScanner/tableUpdates">
+  <div sse-swap="data">
+    {#fragment scannerTable}
+    <table>
+    {#for row in data}
+      {#if row_isFirst}
+      <thead>
+      <tr>
+      {#for cell in row}
+        <th>{cell}</th>
+      {/for}
+      </tr>
+      </thead>
+      {#else}
+      <tbody>
+      <tr>
+      	{#for cell in row}
+	    <td>{cell}</td>
+	    {/for}
+      </tr>
+      </tbody>
+      {/if}
+    {/for}
+    </table>
+    {/fragment}
+  </div>
+</div>
+</body>
+</html>
